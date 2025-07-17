@@ -5,7 +5,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-/// @title ChainChaos - Simple betting game
+/// @title ChainChaos - Simple Manual Betting Game
 /// @notice Owner creates bets manually, players participate, owner settles manually.
 
 contract ChainChaos is Ownable {
@@ -26,6 +26,7 @@ contract ChainChaos is Ownable {
     error InvalidBetAmount();
     error WrongCurrency();
     error PlayerAlreadyBet();
+    error BettingCutoffPeriod();
 
     enum CurrencyType {
         NATIVE, // TXZ
@@ -57,9 +58,13 @@ contract ChainChaos is Ownable {
         bool refundMode; // True if <= 1 unique player
         PlayerBet[] playerBets;
         uint256 createdAt;
+        uint256 startTime; // When betting starts (informational)
+        uint256 endTime; // When betting ends (informational)
     }
 
     uint256 public constant OWNER_FEE_PERCENT = 5; // 5% owner fee
+    uint256 public constant BETTING_CUTOFF_PERIOD = 1 minutes; // No betting 2 minutes before end
+    uint256 public constant BET_DURATION = 5 minutes; // Bet duration
     uint256 public nextBetId = 1;
 
     mapping(uint256 => Bet) public bets;
@@ -88,101 +93,133 @@ contract ChainChaos is Ownable {
         uint256 indexed betId,
         uint256 actualValue,
         uint256[] winnerIndices,
-        bool refundMode
+        uint256 totalPayout
     );
 
     event BetCancelled(uint256 indexed betId);
 
     event PrizeClaimed(
         uint256 indexed betId,
-        address indexed winner,
-        uint256 prize
+        address indexed player,
+        uint256 amount
     );
 
-    event Refunded(
+    event RefundClaimed(
         uint256 indexed betId,
         address indexed player,
         uint256 amount
     );
 
-    event OwnerFeeCollected(uint256 indexed betId, uint256 fee);
-
+    /// @param _usdcToken Address of USDC token contract
     constructor(address _usdcToken) Ownable(msg.sender) {
         usdcToken = IERC20(_usdcToken);
     }
 
-    /// @notice Create a new bet
+    /// @notice Create a new bet (owner only)
+    /// @param category The prediction category
+    /// @param description Human readable description
+    /// @param currencyType Currency type (NATIVE or USDC)
+    /// @param betAmount Fixed bet amount in wei/smallest unit
+    /// @param startTime Optional start time (0 for immediate)
+    /// @param endTime Optional end time (0 for no limit)
     function createBet(
         string memory category,
         string memory description,
         CurrencyType currencyType,
-        uint256 betAmount
+        uint256 betAmount,
+        uint256 startTime,
+        uint256 endTime
     ) external onlyOwner returns (uint256) {
+        return
+            _createBet(
+                category,
+                description,
+                currencyType,
+                betAmount,
+                startTime,
+                endTime
+            );
+    }
+
+    /// @notice Internal function to create a bet
+    function _createBet(
+        string memory category,
+        string memory description,
+        CurrencyType currencyType,
+        uint256 betAmount,
+        uint256 startTime,
+        uint256 endTime
+    ) internal returns (uint256) {
         if (betAmount == 0) {
             revert InvalidBetAmount();
         }
 
         uint256 betId = nextBetId++;
 
-        Bet storage newBet = bets[betId];
-        newBet.id = betId;
-        newBet.category = category;
-        newBet.description = description;
-        newBet.currencyType = currencyType;
-        newBet.betAmount = betAmount;
-        newBet.status = BetStatus.ACTIVE;
-        newBet.createdAt = block.timestamp;
+        Bet storage bet = bets[betId];
+        bet.id = betId;
+        bet.category = category;
+        bet.description = description;
+        bet.currencyType = currencyType;
+        bet.betAmount = betAmount;
+        bet.status = BetStatus.ACTIVE;
+        bet.createdAt = block.timestamp;
+        bet.startTime = startTime == 0 ? block.timestamp : startTime;
+        bet.endTime = endTime == 0 ? block.timestamp + BET_DURATION : endTime;
 
         activeBetIds.push(betId);
 
         emit BetCreated(betId, category, description, currencyType, betAmount);
+
         return betId;
     }
 
-    /// @notice Place a bet with native currency
-    function placeBetNative(uint256 betId, uint256 guess) external payable {
+    /// @notice Place a bet guess
+    /// @param betId The bet ID
+    /// @param guess The player's guess/prediction
+    function placeBet(uint256 betId, uint256 guess) external payable {
         Bet storage bet = bets[betId];
+
         if (bet.status != BetStatus.ACTIVE) {
             revert BetNotActive();
         }
-        if (bet.currencyType != CurrencyType.NATIVE) {
-            revert WrongCurrency();
+
+        // Check if we're within the betting cutoff period (2 minutes before end)
+        if (
+            bet.endTime > 0 &&
+            block.timestamp >= (bet.endTime - BETTING_CUTOFF_PERIOD)
+        ) {
+            revert BettingCutoffPeriod();
         }
-        if (msg.value != bet.betAmount) {
-            revert InvalidBetAmount();
-        }
+
         if (hasPlayerBet[betId][msg.sender]) {
             revert PlayerAlreadyBet();
         }
 
-        bet.playerBets.push(
-            PlayerBet({player: msg.sender, guess: guess, claimed: false})
-        );
+        if (bet.currencyType == CurrencyType.NATIVE) {
+            if (msg.value != bet.betAmount) {
+                revert InvalidBetAmount();
+            }
+        } else {
+            if (msg.value != 0) {
+                revert WrongCurrency();
+            }
 
-        bet.totalPot += msg.value;
-        hasPlayerBet[betId][msg.sender] = true;
+            // Check USDC allowance
+            uint256 allowance = usdcToken.allowance(msg.sender, address(this));
+            if (allowance < bet.betAmount) {
+                revert InsufficientUSDCAllowance();
+            }
 
-        emit PlayerBetPlaced(betId, msg.sender, guess);
-    }
-
-    /// @notice Place a bet with USDC
-    function placeBetUSDC(uint256 betId, uint256 guess) external {
-        Bet storage bet = bets[betId];
-        if (bet.status != BetStatus.ACTIVE) {
-            revert BetNotActive();
-        }
-        if (bet.currencyType != CurrencyType.USDC) {
-            revert WrongCurrency();
-        }
-        if (usdcToken.allowance(msg.sender, address(this)) < bet.betAmount) {
-            revert InsufficientUSDCAllowance();
-        }
-        if (hasPlayerBet[betId][msg.sender]) {
-            revert PlayerAlreadyBet();
+            // Transfer USDC from player
+            usdcToken.safeTransferFrom(
+                msg.sender,
+                address(this),
+                bet.betAmount
+            );
         }
 
-        usdcToken.safeTransferFrom(msg.sender, address(this), bet.betAmount);
-
+        // Record the bet
         bet.playerBets.push(
             PlayerBet({player: msg.sender, guess: guess, claimed: false})
         );
@@ -193,11 +230,19 @@ contract ChainChaos is Ownable {
         emit PlayerBetPlaced(betId, msg.sender, guess);
     }
 
-    /// @notice Settle a bet manually
+    /// @notice Settle bet by determining actual value and winners (owner only)
+    /// @param betId The bet ID to settle
+    /// @param actualValue The actual measured value
     function settleBet(uint256 betId, uint256 actualValue) external onlyOwner {
+        _settleBet(betId, actualValue);
+    }
+
+    /// @notice Internal settle bet function
+    function _settleBet(uint256 betId, uint256 actualValue) internal {
         Bet storage bet = bets[betId];
+
         if (bet.status != BetStatus.ACTIVE) {
-            revert BetNotActive();
+            revert BetAlreadySettled();
         }
 
         bet.actualValue = actualValue;
@@ -207,185 +252,154 @@ contract ChainChaos is Ownable {
         _removeFromActiveBets(betId);
         settledBetIds.push(betId);
 
-        // Check if we should refund (≤ 1 unique player)
-        if (_shouldRefund(bet)) {
+        // Determine winners (closest guesses)
+        uint256[] memory winnerIndices = _determineWinners(betId, actualValue);
+        bet.winnerIndices = winnerIndices;
+
+        // Check if refund mode (≤1 unique player)
+        if (bet.playerBets.length <= 1) {
             bet.refundMode = true;
-            emit BetSettled(betId, actualValue, new uint256[](0), true);
-        } else {
-            // Find winners (closest to actual value)
-            uint256[] memory winners = _findWinners(bet);
-            bet.winnerIndices = winners;
-
-            // Collect owner fees
-            _collectOwnerFees(bet);
-
-            emit BetSettled(betId, actualValue, winners, false);
         }
+
+        uint256 totalPayout = bet.totalPot;
+
+        emit BetSettled(betId, actualValue, winnerIndices, totalPayout);
     }
 
-    /// @notice Cancel a bet (refund all players)
+    /// @notice Cancel a bet and refund all players (owner only)
+    /// @param betId The bet ID to cancel
     function cancelBet(uint256 betId) external onlyOwner {
         Bet storage bet = bets[betId];
+
         if (bet.status != BetStatus.ACTIVE) {
-            revert BetNotActive();
+            revert BetAlreadySettled();
         }
 
         bet.status = BetStatus.CANCELLED;
-        bet.refundMode = true;
+        bet.refundMode = true; // Everyone gets refunded
 
         // Remove from active bets
         _removeFromActiveBets(betId);
+        settledBetIds.push(betId);
 
         emit BetCancelled(betId);
     }
 
-    /// @notice Claim prize or refund
+    /// @notice Claim prize for winning bet
+    /// @param betId The bet ID
     function claimPrize(uint256 betId) external {
         Bet storage bet = bets[betId];
-        if (bet.status == BetStatus.ACTIVE) {
+
+        if (
+            bet.status != BetStatus.SETTLED && bet.status != BetStatus.CANCELLED
+        ) {
             revert BetNotSettled();
         }
 
-        if (bet.refundMode || bet.status == BetStatus.CANCELLED) {
-            _claimRefund(bet, betId);
-        } else {
-            _claimWinnerPrize(bet, betId);
-        }
-    }
-
-    /// @notice Internal function to find winners
-    function _findWinners(
-        Bet storage bet
-    ) internal view returns (uint256[] memory) {
-        if (bet.playerBets.length == 0) return new uint256[](0);
-
-        uint256 closestDiff = type(uint256).max;
-        uint256 winnerCount = 0;
-
-        // Find closest difference
-        for (uint256 i = 0; i < bet.playerBets.length; i++) {
-            uint256 diff = _absDiff(bet.playerBets[i].guess, bet.actualValue);
-            if (diff < closestDiff) {
-                closestDiff = diff;
-                winnerCount = 1;
-            } else if (diff == closestDiff) {
-                winnerCount++;
-            }
+        // Handle refund mode (cancelled bets or ≤1 player)
+        if (bet.refundMode) {
+            _claimRefund(betId);
+            return;
         }
 
-        // Collect winners
-        uint256[] memory winners = new uint256[](winnerCount);
-        uint256 index = 0;
-        for (uint256 i = 0; i < bet.playerBets.length; i++) {
-            uint256 diff = _absDiff(bet.playerBets[i].guess, bet.actualValue);
-            if (diff == closestDiff) {
-                winners[index++] = i;
-            }
-        }
-
-        return winners;
-    }
-
-    /// @notice Internal function to handle refunds
-    function _claimRefund(Bet storage bet, uint256 betId) internal {
-        uint256 totalRefund = 0;
-
-        for (uint256 i = 0; i < bet.playerBets.length; i++) {
-            if (
-                bet.playerBets[i].player == msg.sender &&
-                !bet.playerBets[i].claimed
-            ) {
-                bet.playerBets[i].claimed = true;
-                totalRefund += bet.betAmount;
-            }
-        }
-
-        if (totalRefund == 0) {
-            revert NoRefundAvailable();
-        }
-
-        if (bet.currencyType == CurrencyType.NATIVE) {
-            payable(msg.sender).transfer(totalRefund);
-        } else {
-            usdcToken.safeTransfer(msg.sender, totalRefund);
-        }
-
-        emit Refunded(betId, msg.sender, totalRefund);
-    }
-
-    /// @notice Internal function to handle winner prize claims
-    function _claimWinnerPrize(Bet storage bet, uint256 betId) internal {
-        uint256 userWinningBets = 0;
+        // Find player's bet and check if winner
         bool isWinner = false;
+        uint256 playerIndex = 0;
 
-        // Check if sender is a winner and count their winning bets
-        for (uint256 i = 0; i < bet.winnerIndices.length; i++) {
-            uint256 winnerIndex = bet.winnerIndices[i];
-            if (
-                bet.playerBets[winnerIndex].player == msg.sender &&
-                !bet.playerBets[winnerIndex].claimed
-            ) {
-                bet.playerBets[winnerIndex].claimed = true;
-                userWinningBets++;
-                isWinner = true;
+        for (uint256 i = 0; i < bet.playerBets.length; i++) {
+            if (bet.playerBets[i].player == msg.sender) {
+                playerIndex = i;
+                break;
             }
         }
 
-        if (!isWinner) {
+        // Check if player index is in winner indices
+        for (uint256 i = 0; i < bet.winnerIndices.length; i++) {
+            if (bet.winnerIndices[i] == playerIndex) {
+                isWinner = true;
+                break;
+            }
+        }
+
+        if (!isWinner || bet.playerBets[playerIndex].claimed) {
             revert NotWinnerOrAlreadyClaimed();
         }
 
-        // Calculate prize: (user's winning bets / total winning bets) * remaining pot
-        uint256 remainingPot = bet.totalPot -
-            (bet.totalPot * OWNER_FEE_PERCENT) /
-            100;
-        uint256 prize = (userWinningBets * remainingPot) /
-            bet.winnerIndices.length;
+        // Mark as claimed
+        bet.playerBets[playerIndex].claimed = true;
 
+        // Calculate prize amount
+        uint256 ownerFee = (bet.totalPot * OWNER_FEE_PERCENT) / 100;
+        uint256 prizePool = bet.totalPot - ownerFee;
+        uint256 prizePerWinner = prizePool / bet.winnerIndices.length;
+
+        // Transfer prize
         if (bet.currencyType == CurrencyType.NATIVE) {
-            payable(msg.sender).transfer(prize);
+            payable(msg.sender).transfer(prizePerWinner);
         } else {
-            usdcToken.safeTransfer(msg.sender, prize);
+            usdcToken.safeTransfer(msg.sender, prizePerWinner);
         }
 
-        emit PrizeClaimed(betId, msg.sender, prize);
+        emit PrizeClaimed(betId, msg.sender, prizePerWinner);
     }
 
-    /// @notice Check if bet should be refunded (≤ 1 unique player)
-    function _shouldRefund(Bet storage bet) internal view returns (bool) {
-        if (bet.playerBets.length <= 1) return true;
+    /// @notice Internal function to handle refunds
+    function _claimRefund(uint256 betId) internal {
+        Bet storage bet = bets[betId];
 
-        address firstPlayer = bet.playerBets[0].player;
-        for (uint256 i = 1; i < bet.playerBets.length; i++) {
-            if (bet.playerBets[i].player != firstPlayer) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /// @notice Collect owner fees
-    function _collectOwnerFees(Bet storage bet) internal {
-        uint256 fee = (bet.totalPot * OWNER_FEE_PERCENT) / 100;
-
-        if (fee > 0) {
-            if (bet.currencyType == CurrencyType.NATIVE) {
-                payable(owner()).transfer(fee);
-            } else {
-                usdcToken.safeTransfer(owner(), fee);
-            }
-            emit OwnerFeeCollected(bet.id, fee);
-        }
-    }
-
-    /// @notice Remove bet from active bets array
-    function _removeFromActiveBets(uint256 betId) internal {
-        for (uint256 i = 0; i < activeBetIds.length; i++) {
-            if (activeBetIds[i] == betId) {
-                activeBetIds[i] = activeBetIds[activeBetIds.length - 1];
-                activeBetIds.pop();
+        // Find player's bet
+        uint256 playerIndex = type(uint256).max;
+        for (uint256 i = 0; i < bet.playerBets.length; i++) {
+            if (bet.playerBets[i].player == msg.sender) {
+                playerIndex = i;
                 break;
             }
+        }
+
+        if (
+            playerIndex == type(uint256).max ||
+            bet.playerBets[playerIndex].claimed
+        ) {
+            revert NoRefundAvailable();
+        }
+
+        // Mark as claimed
+        bet.playerBets[playerIndex].claimed = true;
+
+        // Refund original bet amount
+        if (bet.currencyType == CurrencyType.NATIVE) {
+            payable(msg.sender).transfer(bet.betAmount);
+        } else {
+            usdcToken.safeTransfer(msg.sender, bet.betAmount);
+        }
+
+        emit RefundClaimed(betId, msg.sender, bet.betAmount);
+    }
+
+    /// @notice Withdraw owner fees
+    function withdrawFees() external onlyOwner {
+        // Calculate total fees from settled non-refund bets
+        uint256 totalNativeFees = 0;
+        uint256 totalUsdcFees = 0;
+
+        for (uint256 i = 0; i < settledBetIds.length; i++) {
+            Bet storage bet = bets[settledBetIds[i]];
+            if (!bet.refundMode && bet.totalPot > 0) {
+                uint256 fee = (bet.totalPot * OWNER_FEE_PERCENT) / 100;
+                if (bet.currencyType == CurrencyType.NATIVE) {
+                    totalNativeFees += fee;
+                } else {
+                    totalUsdcFees += fee;
+                }
+            }
+        }
+
+        // Transfer fees
+        if (totalNativeFees > 0) {
+            payable(owner()).transfer(totalNativeFees);
+        }
+        if (totalUsdcFees > 0) {
+            usdcToken.safeTransfer(owner(), totalUsdcFees);
         }
     }
 
@@ -397,7 +411,7 @@ contract ChainChaos is Ownable {
     function getBetInfo(
         uint256 betId
     )
-        external
+        public
         view
         returns (
             uint256 id,
@@ -410,7 +424,9 @@ contract ChainChaos is Ownable {
             uint256 totalPot,
             bool refundMode,
             uint256 playerBetCount,
-            uint256 createdAt
+            uint256 createdAt,
+            uint256 startTime,
+            uint256 endTime
         )
     {
         Bet storage bet = bets[betId];
@@ -425,22 +441,10 @@ contract ChainChaos is Ownable {
             bet.totalPot,
             bet.refundMode,
             bet.playerBets.length,
-            bet.createdAt
+            bet.createdAt,
+            bet.startTime,
+            bet.endTime
         );
-    }
-
-    function getBetWinnerIndices(
-        uint256 betId
-    ) external view returns (uint256[] memory) {
-        return bets[betId].winnerIndices;
-    }
-
-    function getPlayerBet(
-        uint256 betId,
-        uint256 playerBetIndex
-    ) external view returns (address player, uint256 guess, bool claimed) {
-        PlayerBet storage playerBet = bets[betId].playerBets[playerBetIndex];
-        return (playerBet.player, playerBet.guess, playerBet.claimed);
     }
 
     function getActiveBets() external view returns (uint256[] memory) {
@@ -455,5 +459,117 @@ contract ChainChaos is Ownable {
         return bets[betId].totalPot;
     }
 
-    receive() external payable {}
+    function getBetWinnerIndices(
+        uint256 betId
+    ) external view returns (uint256[] memory) {
+        return bets[betId].winnerIndices;
+    }
+
+    function getPlayerBet(
+        uint256 betId,
+        address player
+    ) external view returns (uint256 guess, bool claimed) {
+        Bet storage bet = bets[betId];
+        for (uint256 i = 0; i < bet.playerBets.length; i++) {
+            if (bet.playerBets[i].player == player) {
+                return (bet.playerBets[i].guess, bet.playerBets[i].claimed);
+            }
+        }
+        revert("Player has not bet on this game");
+    }
+
+    function getBetPlayers(
+        uint256 betId
+    ) external view returns (address[] memory players) {
+        Bet storage bet = bets[betId];
+        players = new address[](bet.playerBets.length);
+        for (uint256 i = 0; i < bet.playerBets.length; i++) {
+            players[i] = bet.playerBets[i].player;
+        }
+    }
+
+    function getBetPlayerGuesses(
+        uint256 betId
+    ) external view returns (uint256[] memory guesses) {
+        Bet storage bet = bets[betId];
+        guesses = new uint256[](bet.playerBets.length);
+        for (uint256 i = 0; i < bet.playerBets.length; i++) {
+            guesses[i] = bet.playerBets[i].guess;
+        }
+    }
+
+    /// @notice Check if betting is currently allowed for a specific bet
+    /// @param betId The bet ID to check
+    /// @return isActive True if betting is allowed, false if bet is settled/cancelled or in cutoff period
+    function isBettingActive(
+        uint256 betId
+    ) external view returns (bool isActive) {
+        Bet storage bet = bets[betId];
+
+        // Bet must be active
+        if (bet.status != BetStatus.ACTIVE) {
+            return false;
+        }
+
+        // Check if we're within the betting cutoff period
+        if (
+            bet.endTime > 0 &&
+            block.timestamp >= (bet.endTime - BETTING_CUTOFF_PERIOD)
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /// @notice Internal helper to determine winners (closest guesses)
+    function _determineWinners(
+        uint256 betId,
+        uint256 actualValue
+    ) internal view returns (uint256[] memory) {
+        Bet storage bet = bets[betId];
+
+        if (bet.playerBets.length == 0) {
+            return new uint256[](0);
+        }
+
+        uint256 minDiff = type(uint256).max;
+        uint256 winnerCount = 0;
+
+        // First pass: find minimum difference
+        for (uint256 i = 0; i < bet.playerBets.length; i++) {
+            uint256 diff = _absDiff(bet.playerBets[i].guess, actualValue);
+            if (diff < minDiff) {
+                minDiff = diff;
+                winnerCount = 1;
+            } else if (diff == minDiff) {
+                winnerCount++;
+            }
+        }
+
+        // Second pass: collect winner indices
+        uint256[] memory winners = new uint256[](winnerCount);
+        uint256 winnerIndex = 0;
+
+        for (uint256 i = 0; i < bet.playerBets.length; i++) {
+            uint256 diff = _absDiff(bet.playerBets[i].guess, actualValue);
+            if (diff == minDiff) {
+                winners[winnerIndex] = i;
+                winnerIndex++;
+            }
+        }
+
+        return winners;
+    }
+
+    /// @notice Remove bet from active bets array
+    function _removeFromActiveBets(uint256 betId) internal {
+        for (uint256 i = 0; i < activeBetIds.length; i++) {
+            if (activeBetIds[i] == betId) {
+                activeBetIds[i] = activeBetIds[activeBetIds.length - 1];
+                activeBetIds.pop();
+                break;
+            }
+        }
+    }
 }

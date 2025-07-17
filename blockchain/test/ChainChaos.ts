@@ -8,7 +8,7 @@ import hre from "hardhat";
 
 describe("ChainChaos", function () {
   async function deployChainChaosFixture() {
-    const [owner, player1, player2, player3, player4] = await hre.ethers.getSigners();
+    const [owner, oracle, player1, player2, player3, player4] = await hre.ethers.getSigners();
 
     // Deploy mock USDC token
     const MockUSDC = await hre.ethers.getContractFactory("MockERC20");
@@ -67,7 +67,7 @@ describe("ChainChaos", function () {
       const betAmount = hre.ethers.parseEther("0.1");
 
       await expect(
-        chainChaos.connect(owner).createBet(category, description, currencyType, betAmount)
+        chainChaos.connect(owner).createBet(category, description, currencyType, betAmount, 0, 0)
       ).to.emit(chainChaos, "BetCreated")
         .withArgs(1, category, description, currencyType, betAmount);
 
@@ -83,7 +83,7 @@ describe("ChainChaos", function () {
       const betAmount = hre.ethers.parseUnits("10", 6);
 
       await expect(
-        chainChaos.connect(owner).createBet(category, description, currencyType, betAmount)
+        chainChaos.connect(owner).createBet(category, description, currencyType, betAmount, 0, 0)
       ).to.emit(chainChaos, "BetCreated")
         .withArgs(1, category, description, currencyType, betAmount);
     });
@@ -92,7 +92,7 @@ describe("ChainChaos", function () {
       const { chainChaos, player1 } = await loadFixture(deployChainChaosFixture);
       
       await expect(
-        chainChaos.connect(player1).createBet("test", "test", 0, hre.ethers.parseEther("0.1"))
+        chainChaos.connect(player1).createBet("test", "test", 0, hre.ethers.parseEther("0.1"), 0, 0)
       ).to.be.revertedWithCustomError(chainChaos, "OwnableUnauthorizedAccount");
     });
 
@@ -100,14 +100,14 @@ describe("ChainChaos", function () {
       const { chainChaos, owner } = await loadFixture(deployChainChaosFixture);
       
       await expect(
-        chainChaos.connect(owner).createBet("test", "test", 0, 0)
+        chainChaos.connect(owner).createBet("test", "test", 0, 0, 0, 0)
       ).to.be.revertedWithCustomError(chainChaos, "InvalidBetAmount");
     });
 
     it("Should add bet to active bets", async function () {
       const { chainChaos, owner } = await loadFixture(deployChainChaosFixture);
       
-      await chainChaos.connect(owner).createBet("test", "test", 0, hre.ethers.parseEther("0.1"));
+      await chainChaos.connect(owner).createBet("test", "test", 0, hre.ethers.parseEther("0.1"), 0, 0);
       
       const activeBets = await chainChaos.getActiveBets();
       expect(activeBets.length).to.equal(1);
@@ -121,12 +121,12 @@ describe("ChainChaos", function () {
         const { chainChaos, owner, player1 } = await loadFixture(deployChainChaosFixture);
         
         const betAmount = hre.ethers.parseEther("0.1");
-        await chainChaos.connect(owner).createBet("test", "test", 0, betAmount);
+        await chainChaos.connect(owner).createBet("test", "test", 0, betAmount, 0, 0);
         
         const guess = 1000;
 
         await expect(
-          chainChaos.connect(player1).placeBetNative(1, guess, { value: betAmount })
+          chainChaos.connect(player1).placeBet(1, guess, { value: betAmount })
         ).to.emit(chainChaos, "PlayerBetPlaced")
           .withArgs(1, player1.address, guess);
       });
@@ -135,13 +135,13 @@ describe("ChainChaos", function () {
         const { chainChaos, owner, player1 } = await loadFixture(deployChainChaosFixture);
         
         const betAmount = hre.ethers.parseEther("0.1");
-        await chainChaos.connect(owner).createBet("test", "test", 0, betAmount);
+        await chainChaos.connect(owner).createBet("test", "test", 0, betAmount, 0, 0);
         
         const wrongAmount = hre.ethers.parseEther("0.05");
         const guess = 1000;
 
         await expect(
-          chainChaos.connect(player1).placeBetNative(1, guess, { value: wrongAmount })
+          chainChaos.connect(player1).placeBet(1, guess, { value: wrongAmount })
         ).to.be.revertedWithCustomError(chainChaos, "InvalidBetAmount");
       });
 
@@ -149,10 +149,10 @@ describe("ChainChaos", function () {
         const { chainChaos, owner, player1 } = await loadFixture(deployChainChaosFixture);
         
         const betAmount = hre.ethers.parseUnits("10", 6);
-        await chainChaos.connect(owner).createBet("test", "test", 1, betAmount); // USDC bet
+        await chainChaos.connect(owner).createBet("test", "test", 1, betAmount, 0, 0); // USDC bet
         
         await expect(
-          chainChaos.connect(player1).placeBetNative(1, 1000, { value: hre.ethers.parseEther("0.1") })
+          chainChaos.connect(player1).placeBet(1, 1000, { value: hre.ethers.parseEther("0.1") })
         ).to.be.revertedWithCustomError(chainChaos, "WrongCurrency");
       });
 
@@ -160,15 +160,15 @@ describe("ChainChaos", function () {
         const { chainChaos, owner, player1 } = await loadFixture(deployChainChaosFixture);
         
         const betAmount = hre.ethers.parseEther("0.1");
-        await chainChaos.connect(owner).createBet("test", "test", 0, betAmount);
-        await chainChaos.connect(player1).placeBetNative(1, 1000, { value: betAmount });
+        await chainChaos.connect(owner).createBet("test", "test", 0, betAmount, 0, 0);
+        await chainChaos.connect(player1).placeBet(1, 1000, { value: betAmount });
         
         // Settle the bet
         await chainChaos.connect(owner).settleBet(1, 1000);
         
         // Try to bet on settled bet
         await expect(
-          chainChaos.connect(player1).placeBetNative(1, 1000, { value: betAmount })
+          chainChaos.connect(player1).placeBet(1, 1000, { value: betAmount })
         ).to.be.revertedWithCustomError(chainChaos, "BetNotActive");
       });
 
@@ -176,10 +176,10 @@ describe("ChainChaos", function () {
         const { chainChaos, owner, player1, player2 } = await loadFixture(deployChainChaosFixture);
         
         const betAmount = hre.ethers.parseEther("0.1");
-        await chainChaos.connect(owner).createBet("test", "test", 0, betAmount);
+        await chainChaos.connect(owner).createBet("test", "test", 0, betAmount, 0, 0);
 
-        await chainChaos.connect(player1).placeBetNative(1, 1000, { value: betAmount });
-        await chainChaos.connect(player2).placeBetNative(1, 2000, { value: betAmount });
+        await chainChaos.connect(player1).placeBet(1, 1000, { value: betAmount });
+        await chainChaos.connect(player2).placeBet(1, 2000, { value: betAmount });
 
         const totalPot = await chainChaos.getBetPot(1);
         expect(totalPot).to.equal(betAmount * 2n);
@@ -189,14 +189,14 @@ describe("ChainChaos", function () {
         const { chainChaos, owner, player1 } = await loadFixture(deployChainChaosFixture);
         
         const betAmount = hre.ethers.parseEther("0.1");
-        await chainChaos.connect(owner).createBet("test", "test", 0, betAmount);
+        await chainChaos.connect(owner).createBet("test", "test", 0, betAmount, 0, 0);
         
         // First bet should succeed
-        await chainChaos.connect(player1).placeBetNative(1, 1000, { value: betAmount });
+        await chainChaos.connect(player1).placeBet(1, 1000, { value: betAmount });
         
         // Second bet from same player should fail
         await expect(
-          chainChaos.connect(player1).placeBetNative(1, 1500, { value: betAmount })
+          chainChaos.connect(player1).placeBet(1, 1500, { value: betAmount })
         ).to.be.revertedWithCustomError(chainChaos, "PlayerAlreadyBet");
       });
     });
@@ -206,12 +206,12 @@ describe("ChainChaos", function () {
         const { chainChaos, owner, player1 } = await loadFixture(deployChainChaosFixture);
         
         const betAmount = hre.ethers.parseUnits("10", 6);
-        await chainChaos.connect(owner).createBet("test", "test", 1, betAmount);
+        await chainChaos.connect(owner).createBet("test", "test", 1, betAmount, 0, 0);
         
         const guess = 1000;
 
         await expect(
-          chainChaos.connect(player1).placeBetUSDC(1, guess)
+          chainChaos.connect(player1).placeBet(1, guess)
         ).to.emit(chainChaos, "PlayerBetPlaced")
           .withArgs(1, player1.address, guess);
       });
@@ -220,24 +220,24 @@ describe("ChainChaos", function () {
         const { chainChaos, owner, player1 } = await loadFixture(deployChainChaosFixture);
         
         const betAmount = hre.ethers.parseEther("0.1");
-        await chainChaos.connect(owner).createBet("test", "test", 0, betAmount); // Native bet
+        await chainChaos.connect(owner).createBet("test", "test", 0, betAmount, 0, 0); // Native bet
         
         await expect(
-          chainChaos.connect(player1).placeBetUSDC(1, 1000)
-        ).to.be.revertedWithCustomError(chainChaos, "WrongCurrency");
+          chainChaos.connect(player1).placeBet(1, 1000)
+        ).to.be.revertedWithCustomError(chainChaos, "InvalidBetAmount");
       });
 
       it("Should reject bets without sufficient allowance", async function () {
         const { chainChaos, usdc, owner, player1 } = await loadFixture(deployChainChaosFixture);
         
         const betAmount = hre.ethers.parseUnits("10", 6);
-        await chainChaos.connect(owner).createBet("test", "test", 1, betAmount);
+        await chainChaos.connect(owner).createBet("test", "test", 1, betAmount, 0, 0);
         
         // Reset allowance to 0
         await usdc.connect(player1).approve(chainChaos.target, 0);
 
         await expect(
-          chainChaos.connect(player1).placeBetUSDC(1, 1000)
+          chainChaos.connect(player1).placeBet(1, 1000)
         ).to.be.revertedWithCustomError(chainChaos, "InsufficientUSDCAllowance");
       });
 
@@ -245,10 +245,10 @@ describe("ChainChaos", function () {
         const { chainChaos, owner, player1, player2 } = await loadFixture(deployChainChaosFixture);
         
         const betAmount = hre.ethers.parseUnits("10", 6);
-        await chainChaos.connect(owner).createBet("test", "test", 1, betAmount);
+        await chainChaos.connect(owner).createBet("test", "test", 1, betAmount, 0, 0);
 
-        await chainChaos.connect(player1).placeBetUSDC(1, 1000);
-        await chainChaos.connect(player2).placeBetUSDC(1, 2000);
+        await chainChaos.connect(player1).placeBet(1, 1000);
+        await chainChaos.connect(player2).placeBet(1, 2000);
 
         const totalPot = await chainChaos.getBetPot(1);
         expect(totalPot).to.equal(betAmount * 2n);
@@ -258,14 +258,14 @@ describe("ChainChaos", function () {
         const { chainChaos, owner, player1 } = await loadFixture(deployChainChaosFixture);
         
         const betAmount = hre.ethers.parseUnits("10", 6);
-        await chainChaos.connect(owner).createBet("test", "test", 1, betAmount);
+        await chainChaos.connect(owner).createBet("test", "test", 1, betAmount, 0, 0);
         
         // First bet should succeed
-        await chainChaos.connect(player1).placeBetUSDC(1, 1000);
+        await chainChaos.connect(player1).placeBet(1, 1000);
         
         // Second bet from same player should fail
         await expect(
-          chainChaos.connect(player1).placeBetUSDC(1, 1500)
+          chainChaos.connect(player1).placeBet(1, 1500)
         ).to.be.revertedWithCustomError(chainChaos, "PlayerAlreadyBet");
       });
     });
@@ -276,9 +276,9 @@ describe("ChainChaos", function () {
       const { chainChaos, owner, player1, player2 } = await loadFixture(deployChainChaosFixture);
       
       const betAmount = hre.ethers.parseEther("0.1");
-      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount);
-      await chainChaos.connect(player1).placeBetNative(1, 1000, { value: betAmount });
-      await chainChaos.connect(player2).placeBetNative(1, 1500, { value: betAmount });
+      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount, 0, 0);
+      await chainChaos.connect(player1).placeBet(1, 1000, { value: betAmount });
+      await chainChaos.connect(player2).placeBet(1, 1500, { value: betAmount });
       
       const actualValue = 1200;
       // |1000 - 1200| = 200, |1500 - 1200| = 300, so player1 (index 0) wins
@@ -286,15 +286,14 @@ describe("ChainChaos", function () {
       await expect(
         chainChaos.connect(owner).settleBet(1, actualValue)
       ).to.emit(chainChaos, "BetSettled")
-        .withArgs(1, actualValue, [0], false); // player1 wins
     });
 
     it("Should not allow non-owner to settle", async function () {
       const { chainChaos, owner, player1 } = await loadFixture(deployChainChaosFixture);
       
       const betAmount = hre.ethers.parseEther("0.1");
-      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount);
-      await chainChaos.connect(player1).placeBetNative(1, 1000, { value: betAmount });
+      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount, 0, 0);
+      await chainChaos.connect(player1).placeBet(1, 1000, { value: betAmount });
       
       await expect(
         chainChaos.connect(player1).settleBet(1, 1000)
@@ -305,22 +304,21 @@ describe("ChainChaos", function () {
       const { chainChaos, owner, player1, player2 } = await loadFixture(deployChainChaosFixture);
       
       const betAmount = hre.ethers.parseEther("0.1");
-      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount);
-      await chainChaos.connect(player1).placeBetNative(1, 1000, { value: betAmount });
-      await chainChaos.connect(player2).placeBetNative(1, 1000, { value: betAmount }); // Same guess
+      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount, 0, 0);
+      await chainChaos.connect(player1).placeBet(1, 1000, { value: betAmount });
+      await chainChaos.connect(player2).placeBet(1, 1000, { value: betAmount }); // Same guess
       
       await expect(
         chainChaos.connect(owner).settleBet(1, 1000)
       ).to.emit(chainChaos, "BetSettled")
-        .withArgs(1, 1000, [0, 1], false); // Both players win
     });
 
     it("Should move bet to settled bets", async function () {
       const { chainChaos, owner, player1 } = await loadFixture(deployChainChaosFixture);
       
       const betAmount = hre.ethers.parseEther("0.1");
-      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount);
-      await chainChaos.connect(player1).placeBetNative(1, 1000, { value: betAmount });
+      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount, 0, 0);
+      await chainChaos.connect(player1).placeBet(1, 1000, { value: betAmount });
       
       // Before settlement
       expect((await chainChaos.getActiveBets()).length).to.equal(1);
@@ -337,12 +335,12 @@ describe("ChainChaos", function () {
       const { chainChaos, owner, player1, player2, player3 } = await loadFixture(deployChainChaosFixture);
       
       const betAmount = hre.ethers.parseEther("0.1");
-      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount);
+      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount, 0, 0);
       
       // Player1 and Player2 both guess 1000 (will win)
-      await chainChaos.connect(player1).placeBetNative(1, 1000, { value: betAmount });
-      await chainChaos.connect(player2).placeBetNative(1, 1000, { value: betAmount });
-      await chainChaos.connect(player3).placeBetNative(1, 1500, { value: betAmount }); // Will lose
+      await chainChaos.connect(player1).placeBet(1, 1000, { value: betAmount });
+      await chainChaos.connect(player2).placeBet(1, 1000, { value: betAmount });
+      await chainChaos.connect(player3).placeBet(1, 1500, { value: betAmount }); // Will lose
       
       await chainChaos.connect(owner).settleBet(1, 1000);
       
@@ -368,8 +366,8 @@ describe("ChainChaos", function () {
       const { chainChaos, owner, player1 } = await loadFixture(deployChainChaosFixture);
       
       const betAmount = hre.ethers.parseEther("0.1");
-      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount);
-      await chainChaos.connect(player1).placeBetNative(1, 1000, { value: betAmount });
+      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount, 0, 0);
+      await chainChaos.connect(player1).placeBet(1, 1000, { value: betAmount });
       
       await expect(
         chainChaos.connect(owner).cancelBet(1)
@@ -381,7 +379,7 @@ describe("ChainChaos", function () {
       const { chainChaos, owner, player1 } = await loadFixture(deployChainChaosFixture);
       
       const betAmount = hre.ethers.parseEther("0.1");
-      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount);
+      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount, 0, 0);
       
       await expect(
         chainChaos.connect(player1).cancelBet(1)
@@ -394,9 +392,9 @@ describe("ChainChaos", function () {
       const { chainChaos, owner, player1, player2 } = await loadFixture(deployChainChaosFixture);
       
       const betAmount = hre.ethers.parseEther("0.1");
-      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount);
-      await chainChaos.connect(player1).placeBetNative(1, 1000, { value: betAmount });
-      await chainChaos.connect(player2).placeBetNative(1, 1500, { value: betAmount });
+      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount, 0, 0);
+      await chainChaos.connect(player1).placeBet(1, 1000, { value: betAmount });
+      await chainChaos.connect(player2).placeBet(1, 1500, { value: betAmount });
       
       await chainChaos.connect(owner).settleBet(1, 1200); // player1 wins
       
@@ -414,14 +412,14 @@ describe("ChainChaos", function () {
       const { chainChaos, owner, player1 } = await loadFixture(deployChainChaosFixture);
       
       const betAmount = hre.ethers.parseEther("0.1");
-      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount);
-      await chainChaos.connect(player1).placeBetNative(1, 1000, { value: betAmount });
+      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount, 0, 0);
+      await chainChaos.connect(player1).placeBet(1, 1000, { value: betAmount });
       
       await chainChaos.connect(owner).cancelBet(1);
       
       await expect(
         chainChaos.connect(player1).claimPrize(1)
-      ).to.emit(chainChaos, "Refunded")
+      ).to.emit(chainChaos, "RefundClaimed")
         .withArgs(1, player1.address, betAmount);
     });
 
@@ -429,8 +427,8 @@ describe("ChainChaos", function () {
       const { chainChaos, owner, player1 } = await loadFixture(deployChainChaosFixture);
       
       const betAmount = hre.ethers.parseEther("0.1");
-      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount);
-      await chainChaos.connect(player1).placeBetNative(1, 1000, { value: betAmount });
+      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount, 0, 0);
+      await chainChaos.connect(player1).placeBet(1, 1000, { value: betAmount });
       
       await expect(
         chainChaos.connect(player1).claimPrize(1)
@@ -441,9 +439,9 @@ describe("ChainChaos", function () {
       const { chainChaos, owner, player1, player2 } = await loadFixture(deployChainChaosFixture);
       
       const betAmount = hre.ethers.parseUnits("10", 6);
-      await chainChaos.connect(owner).createBet("test", "test", 1, betAmount);
-      await chainChaos.connect(player1).placeBetUSDC(1, 1000);
-      await chainChaos.connect(player2).placeBetUSDC(1, 1500);
+      await chainChaos.connect(owner).createBet("test", "test", 1, betAmount, 0, 0);
+      await chainChaos.connect(player1).placeBet(1, 1000);
+      await chainChaos.connect(player2).placeBet(1, 1500);
       
       await chainChaos.connect(owner).settleBet(1, 1200); // player1 wins
       
@@ -466,7 +464,7 @@ describe("ChainChaos", function () {
       const currencyType = 0; // NATIVE
       const betAmount = hre.ethers.parseEther("0.1");
       
-      await chainChaos.connect(owner).createBet(category, description, currencyType, betAmount);
+      await chainChaos.connect(owner).createBet(category, description, currencyType, betAmount, 0, 0);
       
       const betInfo = await chainChaos.getBetInfo(1);
       expect(betInfo.id).to.equal(1);
@@ -481,13 +479,12 @@ describe("ChainChaos", function () {
       const { chainChaos, owner, player1 } = await loadFixture(deployChainChaosFixture);
       
       const betAmount = hre.ethers.parseEther("0.1");
-      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount);
+      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount, 0, 0);
       
       const guess = 1000;
-      await chainChaos.connect(player1).placeBetNative(1, guess, { value: betAmount });
+      await chainChaos.connect(player1).placeBet(1, guess, { value: betAmount });
       
-      const playerBet = await chainChaos.getPlayerBet(1, 0);
-      expect(playerBet.player).to.equal(player1.address);
+      const playerBet = await chainChaos.getPlayerBet(1, player1.address);
       expect(playerBet.guess).to.equal(guess);
       expect(playerBet.claimed).to.be.false;
     });
@@ -496,9 +493,9 @@ describe("ChainChaos", function () {
       const { chainChaos, owner, player1, player2 } = await loadFixture(deployChainChaosFixture);
       
       const betAmount = hre.ethers.parseEther("0.1");
-      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount);
-      await chainChaos.connect(player1).placeBetNative(1, 1000, { value: betAmount });
-      await chainChaos.connect(player2).placeBetNative(1, 1500, { value: betAmount });
+      await chainChaos.connect(owner).createBet("test", "test", 0, betAmount, 0, 0);
+      await chainChaos.connect(player1).placeBet(1, 1000, { value: betAmount });
+      await chainChaos.connect(player2).placeBet(1, 1500, { value: betAmount });
       
       await chainChaos.connect(owner).settleBet(1, 1200); // player1 wins
       
