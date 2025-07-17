@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React from 'react'
 import { useAccount, useReadContract, useChainId } from 'wagmi'
 import { AdminBetCard } from '@/components/AdminBetCard'
 import { CreateBetDialog } from '@/components/CreateBetDialog'
@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { EtherlinkLogo, EtherlinkIcon } from '@/components/ui/EtherlinkLogo'
+import { EtherlinkLogo } from '@/components/ui/EtherlinkLogo'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChainChaosABI } from '@/blockchain/ChainChaosABI'
 import { 
@@ -19,11 +19,10 @@ import {
   isEtherlinkChain,
   getEtherlinkChainName 
 } from '@/lib/wagmi'
-import { Settings, Plus, TrendingUp, Clock, Shield, Users, DollarSign, AlertTriangle, Home } from 'lucide-react'
-import { formatEther, formatUnits } from 'viem'
+import { Settings, Plus, TrendingUp, Clock, Shield, DollarSign, AlertTriangle, Home } from 'lucide-react'
 
 export default function AdminPage() {
-  const { address, isConnected } = useAccount()
+  const { address, isConnected, isConnecting } = useAccount()
   const chainId = useChainId()
 
   const chainChaosAddress = getChainChaosAddress(chainId)
@@ -85,7 +84,26 @@ export default function AdminPage() {
   }
 
   // Handle different states
+  
+  // Show loading while wallet is connecting or initializing
+  if (isConnecting || (!isConnected && typeof window !== 'undefined' && !address)) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-background/95">
+        <div className="container mx-auto px-4 py-8">
+          <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
+            <Shield className="h-16 w-16 text-muted-foreground animate-pulse" />
+            <div className="text-center space-y-2">
+              <h1 className="text-2xl font-bold">Connecting...</h1>
+              <p className="text-muted-foreground">Checking wallet connection</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (!isConnected) {
+    console.log('isConnected', isConnected)
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-background/95">
         <div className="container mx-auto px-4 py-8">
@@ -174,6 +192,11 @@ export default function AdminPage() {
   }
 
   if (ownerError || !isOwner) {
+    console.log('ownerError', ownerError)
+    console.log('isOwner', isOwner)
+    console.log('owner', owner)
+    console.log('address', address)
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-background/95">
         <div className="container mx-auto px-4 py-8">
@@ -200,7 +223,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-background/95">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-background/95 flex flex-col">
       {/* Header */}
       <header className="border-b border-border/40 backdrop-blur-sm bg-background/95 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
@@ -235,7 +258,7 @@ export default function AdminPage() {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8 space-y-8">
+      <main className="container mx-auto px-4 py-8 space-y-8 flex-1">
         {/* Welcome Section */}
         <div className="text-center space-y-4">
           <h2 className="text-3xl font-bold">ChainChaos Management</h2>
@@ -398,15 +421,64 @@ export default function AdminPage() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border/40 bg-background/95 backdrop-blur-sm mt-16">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <EtherlinkIcon size={16} />
-              ChainChaos Admin Panel - {getEtherlinkChainName(chainId)}
+      <footer className="border-t border-border/20 bg-muted/5">
+        <div className="container mx-auto px-4 py-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Brand Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Settings className="h-6 w-6 text-primary" />
+                <span className="font-bold text-lg">ChainChaos Admin</span>
+              </div>
+              <p className="text-sm text-muted-foreground max-w-sm">
+                Admin control panel for ChainChaos prediction markets on {getEtherlinkChainName(chainId)}.
+              </p>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>Powered by</span>
+                <EtherlinkLogo size={18} />
+              </div>
             </div>
-            <div className="text-sm text-muted-foreground">
-              Built with ❤️ on Etherlink
+
+            {/* Admin Links */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-sm uppercase tracking-wide">Admin Tools</h3>
+              <div className="space-y-2">
+                <a href="/" className="block text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  Current Round
+                </a>
+                <a href="/history" className="block text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  Betting History
+                </a>
+                <a href="/admin" className="block text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  Admin Panel
+                </a>
+              </div>
+            </div>
+
+            {/* Admin Features */}
+            <div className="space-y-4">
+              <h3 className="font-semibold text-sm uppercase tracking-wide">Admin Features</h3>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>Create betting rounds</p>
+                <p>Settle & cancel bets</p>
+                <p>Manage platform</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Section */}
+          <div className="border-t border-border/20 mt-8 pt-6">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-sm text-muted-foreground">
+                © 2024 ChainChaos. Built with ❤️ on Etherlink.
+              </div>
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <span>v1.0.0</span>
+                <span>•</span>
+                <span>Admin Portal</span>
+                <span>•</span>
+                <span>{getEtherlinkChainName(chainId)}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -487,6 +559,8 @@ function AdminBetWrapper({
     refundMode: betInfo[8],
     playerBetCount: betInfo[9],
     createdAt: betInfo[10],
+    startTime: betInfo[11],
+    endTime: betInfo[12],
   }
 
   return (

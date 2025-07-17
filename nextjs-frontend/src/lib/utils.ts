@@ -33,7 +33,8 @@ export function formatBetCategory(category: string): string {
 
 // Time formatting
 export function formatTimestamp(timestamp: number): string {
-  return new Date(timestamp * 1000).toLocaleDateString()
+  const date = new Date(timestamp * 1000)
+  return date.toLocaleString()
 }
 
 // Format currency amount with proper symbol
@@ -43,4 +44,11 @@ export function formatCurrencyAmount(value: bigint, currencyType: number): strin
   } else { // USDC
     return `$${formatUSDC(value)} USDC`
   }
+}
+
+export function formatCountdown(seconds: number): string {
+  if (seconds < 0) seconds = 0;
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }

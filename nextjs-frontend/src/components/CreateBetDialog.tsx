@@ -96,7 +96,7 @@ export function CreateBetDialog({ children, onBetCreated }: CreateBetDialogProps
         address: chainChaosAddress,
         abi: ChainChaosABI,
         functionName: 'createBet',
-        args: [category, description, currencyTypeNum, amount],
+        args: [category, description, currencyTypeNum, amount, BigInt(0), BigInt(0)],
       })
     } catch (error) {
       toast.error('Failed to create bet')

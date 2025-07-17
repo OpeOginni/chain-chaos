@@ -141,6 +141,8 @@ export type BetInfo = {
   refundMode: boolean
   playerBetCount: bigint
   createdAt: bigint
+  startTime: bigint
+  endTime: bigint
 }
 
 export type PlayerBet = {
