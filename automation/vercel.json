@@ -1,0 +1,22 @@
+{
+  "functions": {
+    "betting-cron.js": {
+      "runtime": "nodejs20.x",
+      "maxDuration": 30
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cycle",
+      "schedule": "*/5 * * * *"
+    }
+  ],
+  "env": {
+    "CHAIN_ID": "128123",
+    "ORACLE_PRIVATE_KEY": "@oracle-private-key",
+    "CHAINCHAOS_ADDRESS_MAINNET": "@chainchaos-address-mainnet",
+    "USDC_ADDRESS_MAINNET": "@usdc-address-mainnet",
+    "CHAINCHAOS_ADDRESS_TESTNET": "@chainchaos-address-testnet",
+    "USDC_ADDRESS_TESTNET": "@usdc-address-testnet"
+  }
+} 

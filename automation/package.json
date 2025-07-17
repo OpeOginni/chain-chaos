@@ -1,0 +1,31 @@
+{
+  "name": "chainchaos-automation",
+  "version": "1.0.0",
+  "description": "Automated betting cycle management for ChainChaos",
+  "main": "betting-cron.js",
+  "scripts": {
+    "start": "node betting-cron.js",
+    "test": "node betting-cron.js",
+    "deploy:vercel": "vercel --prod",
+    "deploy:aws": "serverless deploy"
+  },
+  "dependencies": {
+    "ethers": "^6.8.0"
+  },
+  "devDependencies": {
+    "serverless": "^3.34.0",
+    "serverless-offline": "^12.0.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "ethereum",
+    "etherlink",
+    "automation",
+    "betting",
+    "prediction-market"
+  ],
+  "author": "ChainChaos Team",
+  "license": "MIT"
+} 
