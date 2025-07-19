@@ -38,49 +38,6 @@ export function NetworkStatus() {
     }
   }
 
-  // If on Etherlink but addresses not available
-  if (isEtherlink && !addressesAvailable) {
-    return (
-      <Alert className="border-red-500/20 bg-red-500/5">
-        <AlertTriangle className="h-4 w-4 text-red-500" />
-        <AlertDescription>
-          <div className="flex items-center justify-between">
-            <div>
-              <EtherlinkIcon size={16} className="inline mr-2" />
-              Connected to {networkName} but contract addresses are not configured.
-              <div className="text-xs text-muted-foreground mt-1">
-                Please configure environment variables for this network.
-              </div>
-            </div>
-            <Badge variant="destructive" className="text-xs">
-              Not Available
-            </Badge>
-          </div>
-        </AlertDescription>
-      </Alert>
-    )
-  }
-
-  // If on Etherlink and addresses available
-  if (isEtherlink && addressesAvailable) {
-    const isMainnet = chainId === etherlinkMainnet.id
-    const badgeColor = isMainnet ? 'default' : 'secondary'
-    
-    return (
-      <Alert className="border-primary/20 bg-primary/5">
-        <CheckCircle className="h-4 w-4 text-primary" />
-        <AlertDescription className="flex items-center gap-2">
-          <EtherlinkIcon size={16} />
-          Connected to {networkName}
-          <Badge variant={badgeColor} className="text-xs">
-            <Wifi className="h-3 w-3 mr-1" />
-            Ready
-          </Badge>
-        </AlertDescription>
-      </Alert>
-    )
-  }
-
   // If not on Etherlink - show switch options
   const availableNetworks = []
   

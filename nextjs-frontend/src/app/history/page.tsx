@@ -24,7 +24,6 @@ export default function HistoryPage() {
             </div>
             
             <div className="flex items-center gap-3">
-              <NetworkStatus />
               <WalletConnection />
               <Button 
                 variant="outline" 

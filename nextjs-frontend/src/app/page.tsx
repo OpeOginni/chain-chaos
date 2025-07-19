@@ -78,7 +78,6 @@ export default function Home() {
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <NetworkStatus />
                 <WalletConnection />
               </div>
             </div>
