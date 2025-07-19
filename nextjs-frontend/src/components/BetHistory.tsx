@@ -1,24 +1,28 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { useAccount, useReadContract, useChainId } from 'wagmi'
-import { useWalletConnection } from '@/hooks/useWalletConnection'
+import React, { useState, useMemo } from 'react'
+import { useActiveAccount, useActiveWalletChain } from 'thirdweb/react'
+import { useReadContract } from "thirdweb/react"
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { BetCard } from '@/components/BetCard'
-import { ChainChaosABI } from '@/blockchain/ChainChaosABI'
 import { 
   BetInfo, 
   BetStatus,
-  CurrencyType,
+  CurrencyType
+} from '@/lib/types'
+import { 
+  getChainChaosContract,
   getChainChaosAddress,
   areAddressesAvailable,
   isEtherlinkChain,
-  getEtherlinkChainName 
-} from '@/lib/wagmi'
+  getEtherlinkChainName,
+  defaultChain
+} from '@/lib/thirdweb'
 import { ArrowLeft, Trophy, Clock, AlertTriangle, Gift } from 'lucide-react'
 
 interface BetHistoryProps {
@@ -26,14 +30,16 @@ interface BetHistoryProps {
 }
 
 export function BetHistory({ onBack }: BetHistoryProps) {
-  const { address } = useAccount()
-  const { isConnected, isHydrated } = useWalletConnection()
-  const chainId = useChainId()
+  const account = useActiveAccount()
+  const activeChain = useActiveWalletChain()
+  const chainId = activeChain?.id || defaultChain.id
   const [expandedBets, setExpandedBets] = useState<Set<string>>(new Set())
 
+  const isConnected = !!account
   const chainChaosAddress = getChainChaosAddress(chainId)
   const addressesAvailable = areAddressesAvailable(chainId)
   const isEtherlink = isEtherlinkChain(chainId)
+  const contract = getChainChaosContract(chainId)
 
   const handleBack = () => {
     if (onBack) {
@@ -43,90 +49,49 @@ export function BetHistory({ onBack }: BetHistoryProps) {
     }
   }
 
-  // Get active bets
+  // Get active bets using useReadContract
   const { 
     data: activeBetIds, 
     isLoading: loadingActive 
   } = useReadContract({
-    address: chainChaosAddress,
-    abi: ChainChaosABI,
-    functionName: 'getActiveBets',
-    query: {
-      enabled: !!chainChaosAddress && addressesAvailable,
+    contract: contract!,
+    method: 'getActiveBets',
+    queryOptions: {
+      enabled: !!contract && addressesAvailable,
       refetchInterval: 30 * 1000, // Refetch every 30 seconds
     },
   })
 
-  // Get settled bets
+  // Get settled bets using useReadContract  
   const { 
     data: settledBetIds, 
     isLoading: loadingSettled 
   } = useReadContract({
-    address: chainChaosAddress,
-    abi: ChainChaosABI,
-    functionName: 'getSettledBets',
-    query: {
-      enabled: !!chainChaosAddress && addressesAvailable,
+    contract: contract!,
+    method: 'getSettledBets',
+    queryOptions: {
+      enabled: !!contract && addressesAvailable,
       refetchInterval: 30 * 1000, // Refetch every 30 seconds
     },
   })
 
-  // Helper function to get a specific bet's info
-  const useBetInfo = (betId: bigint) => {
-    return useReadContract({
-      address: chainChaosAddress,
-      abi: ChainChaosABI,
-      functionName: 'getBetInfo',
-      args: [betId],
-      query: {
-        enabled: !!chainChaosAddress && !!betId,
-        staleTime: 60 * 1000, // Cache for 1 minute
+  // Helper component to fetch and display individual bet data
+  const BetItem = ({ betId }: { betId: bigint }) => {
+    const { data: betData, isLoading } = useReadContract({
+      contract: contract!,
+      method: 'getBetInfo',
+      params: [betId],
+      queryOptions: {
+        enabled: !!contract && !!betId,
+        refetchInterval: 60 * 1000, // Cache for 1 minute
       },
     })
-  }
-
-  // Parse bet data helper
-  const parseBetData = (betData: any): BetInfo => {
-    if (!betData) throw new Error('No bet data')
-    
-    return {
-      id: betData[0],
-      category: betData[1],
-      description: betData[2],
-      currencyType: Number(betData[3]) as CurrencyType,
-      betAmount: betData[4],
-      actualValue: betData[5],
-      status: Number(betData[6]) as BetStatus,
-      totalPot: betData[7],
-      refundMode: betData[8],
-      playerBetCount: betData[9],
-      createdAt: betData[10],
-      startTime: betData[11],
-      endTime: betData[12],
-    }
-  }
-
-  // Create bet components for each bet ID
-  const BetItem = ({ betId }: { betId: bigint }) => {
-    const { data: betData, isLoading } = useBetInfo(betId)
     
     if (isLoading) {
       return <div className="h-32 bg-muted/20 rounded-lg animate-pulse" />
     }
     
     if (!betData) {
-      return null
-    }
-
-    try {
-      const bet = parseBetData(betData)
-      return (
-        <BetCard 
-          bet={bet} 
-          chainId={chainId}
-        />
-      )
-    } catch (error) {
       return (
         <Alert className="border-red-500/20 bg-red-500/5">
           <AlertTriangle className="h-4 w-4 text-red-500" />
@@ -136,6 +101,30 @@ export function BetHistory({ onBack }: BetHistoryProps) {
         </Alert>
       )
     }
+
+    // Transform contract data to BetInfo format
+    const betInfo: BetInfo = {
+      id: betData[0],
+      category: betData[1],
+      description: betData[2],
+      currencyType: Number(betData[3]),
+      betAmount: betData[4],
+      actualValue: betData[5],
+      status: Number(betData[6]),
+      totalPot: betData[7],
+      refundMode: betData[8],
+      playerBetCount: betData[9],
+      createdAt: betData[10],
+      startTime: betData[11],
+      endTime: betData[12],
+    }
+
+    return (
+      <BetCard 
+        bet={betInfo} 
+        chainId={chainId}
+      />
+    )
   }
 
   // Combine all bets (active and settled)
@@ -150,15 +139,6 @@ export function BetHistory({ onBack }: BetHistoryProps) {
     // Sort by ID descending (newest first)
     return uniqueIds.sort((a, b) => Number(b - a))
   }, [activeBetIds, settledBetIds])
-
-  // Count of recent settled bets (individual BetCards will show if user can claim)
-  const unclaimedCount = useMemo(() => {
-    if (!settledBetIds || !isConnected) return 0
-    
-    // Show indicator if there are recent settled bets
-    // The BetCard component handles checking participation and claiming eligibility
-    return Math.min(settledBetIds.length, 5)
-  }, [settledBetIds, isConnected])
 
   // Loading state
   if (loadingActive || loadingSettled) {
@@ -310,23 +290,13 @@ export function BetHistory({ onBack }: BetHistoryProps) {
           </TabsContent>
 
           <TabsContent value="rewards" className="space-y-4">
-            {!isConnected && isHydrated ? (
+            {!isConnected ? (
               <div className="text-center py-16 space-y-4">
                 <Trophy className="h-12 w-12 text-muted-foreground mx-auto" />
                 <div>
                   <h3 className="text-lg font-semibold">Connect Your Wallet</h3>
                   <p className="text-muted-foreground">
                     Connect your wallet to see rewards and claim winnings.
-                  </p>
-                </div>
-              </div>
-            ) : !isHydrated ? (
-              <div className="text-center py-16 space-y-4">
-                <Trophy className="h-12 w-12 text-muted-foreground mx-auto animate-pulse" />
-                <div>
-                  <h3 className="text-lg font-semibold">Loading...</h3>
-                  <p className="text-muted-foreground">
-                    Checking wallet connection...
                   </p>
                 </div>
               </div>

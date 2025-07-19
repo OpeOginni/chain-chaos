@@ -1,11 +1,14 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Providers } from "@/components/Providers"
+import { Inter } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner"
+import { ThirdwebProvider } from "thirdweb/react";
+import Footer from "@/components/Footer";
 
+const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
-  title: "ChainChaos - Etherlink Prediction Markets",
-  description: "The ultimate prediction market platform built on Etherlink. Make predictions on blockchain metrics and win big with XTZ and USDC.",
+  title: "ChainChaos",
+  description: "A decentralized prediction market on Etherlink.",
 };
 
 export default function RootLayout({
@@ -15,11 +18,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className="min-h-screen bg-background text-foreground antialiased">
-        <Providers>
-          {children}
+      <body className={inter.className}>
+        <ThirdwebProvider>
+          <div className="flex flex-col min-h-screen">
+            <main className="flex-1">{children}</main>
+            <Footer />
+          </div>
           <Toaster />
-        </Providers>
+        </ThirdwebProvider>
       </body>
     </html>
   );

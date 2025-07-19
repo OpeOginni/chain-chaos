@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi'
 import { formatEther, formatUnits } from 'viem'
+import { formatActualValue, getCategoryUnit, isGasCategory } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -23,10 +24,12 @@ import { ChainChaosABI } from '@/blockchain/ChainChaosABI'
 import { 
   BetInfo, 
   BetStatus, 
-  CurrencyType,
+  CurrencyType
+} from '@/lib/types'
+import {
   getChainChaosAddress,
   areAddressesAvailable 
-} from '@/lib/wagmi'
+} from '@/lib/thirdweb'
 import { TokenIcon, getTokenSymbol } from '@/components/ui/TokenIcon'
 import { 
   TrendingUp, 
@@ -96,6 +99,8 @@ export function AdminBetCard({ bet, isActive, onBetUpdate }: AdminBetCardProps) 
 
     try {
       setCurrentAction('settle')
+      
+      // Use raw value for all categories (no conversion needed)
       const value = BigInt(Math.floor(parseFloat(actualValue)))
       
       writeContract({
@@ -160,7 +165,7 @@ export function AdminBetCard({ bet, isActive, onBetUpdate }: AdminBetCardProps) 
   }
 
   const formatAmount = (amount: bigint, currencyType: CurrencyType) => {
-    return currencyType === CurrencyType.NATIVE 
+    return currencyType === CurrencyType.XTZ 
       ? formatEther(amount)
       : formatUnits(amount, 6) // USDC has 6 decimals
   }
@@ -267,7 +272,7 @@ export function AdminBetCard({ bet, isActive, onBetUpdate }: AdminBetCardProps) 
             </div>
             <div className="font-semibold">
               {bet.status === BetStatus.SETTLED ? 
-                <span className="text-blue-400">{bet.actualValue.toString()}</span> : 
+                <span className="text-blue-400">{formatActualValue(bet.actualValue)}</span> : 
                 <span className="text-muted-foreground">Pending</span>
               }
             </div>
@@ -312,11 +317,14 @@ export function AdminBetCard({ bet, isActive, onBetUpdate }: AdminBetCardProps) 
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="actualValue">Actual Value</Label>
+                      <Label htmlFor="actualValue" className="text-sm font-medium">
+                        Actual Value
+                      </Label>
                       <Input
                         id="actualValue"
                         type="number"
-                        placeholder="Enter the actual value..."
+                        step="1"
+                        placeholder="Enter actual value"
                         value={actualValue}
                         onChange={(e) => setActualValue(e.target.value)}
                       />
@@ -423,7 +431,7 @@ export function AdminBetCard({ bet, isActive, onBetUpdate }: AdminBetCardProps) 
           <Alert className="border-blue-500/20 bg-blue-500/5">
             <CheckCircle className="h-4 w-4 text-blue-500" />
             <AlertDescription>
-              Bet settled with actual value: <strong>{bet.actualValue.toString()}</strong>
+              Bet settled with actual value: <strong>{formatActualValue(bet.actualValue)}</strong>
             </AlertDescription>
           </Alert>
         )}

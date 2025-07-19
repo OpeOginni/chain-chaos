@@ -1,21 +1,23 @@
 'use client'
 
 import React from 'react'
-import { useAccount, useReadContract, useChainId } from 'wagmi'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useActiveAccount, useActiveWalletChain, useReadContract } from 'thirdweb/react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { BetCard } from '@/components/BetCard'
-import { ChainChaosABI } from '@/blockchain/ChainChaosABI'
 import { 
   BetInfo, 
-  BetStatus,
+  BetStatus
+} from '@/lib/types'
+import { 
+  getChainChaosContract,
   getChainChaosAddress,
   areAddressesAvailable,
   isEtherlinkChain,
-  getEtherlinkChainName 
-} from '@/lib/wagmi'
+  getEtherlinkChainName,
+  defaultChain
+} from '@/lib/thirdweb'
 import { Clock, History, Trophy, AlertTriangle } from 'lucide-react'
 import { formatTimestamp } from '@/lib/utils'
 
@@ -24,8 +26,9 @@ interface CurrentBetProps {
 }
 
 export function CurrentBet({ onShowHistory }: CurrentBetProps) {
-  const { isConnected } = useAccount()
-  const chainId = useChainId()
+  const account = useActiveAccount()
+  const activeChain = useActiveWalletChain()
+  const chainId = activeChain?.id || defaultChain.id
 
   const handleShowHistory = () => {
     if (onShowHistory) {
@@ -38,6 +41,8 @@ export function CurrentBet({ onShowHistory }: CurrentBetProps) {
   const chainChaosAddress = getChainChaosAddress(chainId)
   const addressesAvailable = areAddressesAvailable(chainId)
   const isEtherlink = isEtherlinkChain(chainId)
+  const contract = getChainChaosContract(chainId)
+  const isConnected = !!account
 
   // Get active bets (manual system - show most recent active bet)
   const { 
@@ -46,11 +51,10 @@ export function CurrentBet({ onShowHistory }: CurrentBetProps) {
     isError: errorBet,
     refetch: refetchCurrentBet
   } = useReadContract({
-    address: chainChaosAddress,
-    abi: ChainChaosABI,
-    functionName: 'getActiveBets',
-    query: {
-      enabled: !!chainChaosAddress && addressesAvailable,
+    contract: contract!,
+    method: 'getActiveBets',
+    queryOptions: {
+      enabled: !!contract && addressesAvailable,
       refetchInterval: 15 * 1000, // Refetch every 15 seconds
     },
   })
@@ -62,46 +66,42 @@ export function CurrentBet({ onShowHistory }: CurrentBetProps) {
     data: currentBetData,
     isLoading: loadingBetInfo 
   } = useReadContract({
-    address: chainChaosAddress,
-    abi: ChainChaosABI,
-    functionName: 'getBetInfo',
-    args: mostRecentBetId ? [mostRecentBetId] : undefined,
-    query: {
-      enabled: !!chainChaosAddress && !!mostRecentBetId,
+    contract: contract!,
+    method: 'getBetInfo',
+    params: mostRecentBetId ? [mostRecentBetId] : undefined!,
+    queryOptions: {
+      enabled: !!contract && !!mostRecentBetId,
       refetchInterval: 15 * 1000,
     },
   })
 
   // Check if betting is currently active (considering 1-minute cutoff)
   const { data: isBettingActive } = useReadContract({
-    address: chainChaosAddress,
-    abi: ChainChaosABI,
-    functionName: 'isBettingActive',
-    args: mostRecentBetId ? [mostRecentBetId] : undefined,
-    query: {
-      enabled: !!chainChaosAddress && !!mostRecentBetId,
+    contract: contract!,
+    method: 'isBettingActive',
+    params: mostRecentBetId ? [mostRecentBetId] : undefined!,
+    queryOptions: {
+      enabled: !!contract && !!mostRecentBetId,
       refetchInterval: 5 * 1000, // Check every 5 seconds
     },
   })
 
   // Parse current bet data
   const currentBet: BetInfo | null = currentBetData ? {
-    id: (currentBetData as readonly [bigint, string, string, number, bigint, bigint, number, bigint, boolean, bigint, bigint, bigint, bigint])[0],
-    category: (currentBetData as readonly [bigint, string, string, number, bigint, bigint, number, bigint, boolean, bigint, bigint, bigint, bigint])[1],
-    description: (currentBetData as readonly [bigint, string, string, number, bigint, bigint, number, bigint, boolean, bigint, bigint, bigint, bigint])[2],
-    currencyType: (currentBetData as readonly [bigint, string, string, number, bigint, bigint, number, bigint, boolean, bigint, bigint, bigint, bigint])[3],
-    betAmount: (currentBetData as readonly [bigint, string, string, number, bigint, bigint, number, bigint, boolean, bigint, bigint, bigint, bigint])[4],
-    actualValue: (currentBetData as readonly [bigint, string, string, number, bigint, bigint, number, bigint, boolean, bigint, bigint, bigint, bigint])[5],
-    status: (currentBetData as readonly [bigint, string, string, number, bigint, bigint, number, bigint, boolean, bigint, bigint, bigint, bigint])[6],
-    totalPot: (currentBetData as readonly [bigint, string, string, number, bigint, bigint, number, bigint, boolean, bigint, bigint, bigint, bigint])[7],
-    refundMode: (currentBetData as readonly [bigint, string, string, number, bigint, bigint, number, bigint, boolean, bigint, bigint, bigint, bigint])[8],
-    playerBetCount: (currentBetData as readonly [bigint, string, string, number, bigint, bigint, number, bigint, boolean, bigint, bigint, bigint, bigint])[9],
-    createdAt: (currentBetData as readonly [bigint, string, string, number, bigint, bigint, number, bigint, boolean, bigint, bigint, bigint, bigint])[10],
-    startTime: (currentBetData as readonly [bigint, string, string, number, bigint, bigint, number, bigint, boolean, bigint, bigint, bigint, bigint])[11],
-    endTime: (currentBetData as readonly [bigint, string, string, number, bigint, bigint, number, bigint, boolean, bigint, bigint, bigint, bigint])[12],
+    id: currentBetData[0],
+    category: currentBetData[1],
+    description: currentBetData[2],
+    currencyType: Number(currentBetData[3]),
+    betAmount: currentBetData[4],
+    actualValue: currentBetData[5],
+    status: Number(currentBetData[6]),
+    totalPot: currentBetData[7],
+    refundMode: currentBetData[8],
+    playerBetCount: currentBetData[9],
+    createdAt: currentBetData[10],
+    startTime: currentBetData[11],
+    endTime: currentBetData[12],
   } : null
-
-  // Manual betting system - no countdown timer needed
 
   // Loading state
   if (loadingBet || loadingBetInfo) {
@@ -206,7 +206,7 @@ export function CurrentBet({ onShowHistory }: CurrentBetProps) {
       {/* Current Bet Card */}
       <div className="max-w-2xl mx-auto">
         <BetCard 
-          bet={currentBet} 
+          bet={currentBet}
           chainId={chainId}
         />
       </div>

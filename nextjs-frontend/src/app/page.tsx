@@ -1,55 +1,54 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAccount, useReadContract, useChainId } from 'wagmi'
-import { useWalletConnection } from '@/hooks/useWalletConnection'
-import { WalletConnection } from '@/components/WalletConnection'
+import { useActiveAccount, useActiveWalletChain } from 'thirdweb/react'
+import { ConnectButton } from 'thirdweb/react'
+import { readContract } from 'thirdweb'
 import { CurrentBet } from '@/components/CurrentBet'
-import { NetworkStatus } from '@/components/NetworkStatus'
 import { Button } from '@/components/ui/button'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { EtherlinkLogo } from '@/components/ui/EtherlinkLogo'
-import { ChainChaosABI } from '@/blockchain/ChainChaosABI'
 import { 
-  getChainChaosAddress,
-  areAddressesAvailable,
-  isEtherlinkChain 
-} from '@/lib/wagmi'
-import { Gamepad2, Settings, AlertTriangle, History } from 'lucide-react'
+  getChainChaosContract,
+  supportedChains,
+  defaultChain,
+  getEtherlinkChainName
+} from '@/lib/thirdweb'
+import { client } from '@/lib/client'
+import { Settings, History } from 'lucide-react'
 import Link from 'next/link'
 import { WinnerNotifications } from '@/components/WinnerNotifications'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { AlertTriangle } from 'lucide-react'
 
 export default function Home() {
-  const { address } = useAccount()
-  const { isConnected } = useWalletConnection()
-  const chainId = useChainId()
+  const account = useActiveAccount()
+  const activeChain = useActiveWalletChain()
+  const chainId = activeChain?.id || defaultChain.id
   const [isOwner, setIsOwner] = useState(false)
 
-  const chainChaosAddress = getChainChaosAddress(chainId)
-  const addressesAvailable = areAddressesAvailable(chainId)
-  const isEtherlink = isEtherlinkChain(chainId)
-
-  // Only run contract calls if addresses are available
-  const contractCallsEnabled = isConnected && chainChaosAddress && addressesAvailable
-
-  // Read contract owner
-  const { data: owner } = useReadContract({
-    address: chainChaosAddress,
-    abi: ChainChaosABI,
-    functionName: 'owner',
-    query: {
-      enabled: contractCallsEnabled,
-    },
-  })
+  const contract = getChainChaosContract(chainId)
 
   // Check if user is owner
   useEffect(() => {
-    if (owner && address) {
-      setIsOwner(owner.toLowerCase() === address.toLowerCase())
-    } else {
-      setIsOwner(false)
+    async function checkOwner() {
+      if (!contract || !account?.address) {
+        setIsOwner(false)
+        return
+      }
+
+      try {
+        const owner = await readContract({
+          contract,
+          method: 'owner',
+        })
+        setIsOwner(owner.toLowerCase() === account.address.toLowerCase())
+      } catch (error) {
+        console.error('Error checking owner:', error)
+        setIsOwner(false)
+      }
     }
-  }, [owner, address])
+
+    checkOwner()
+  }, [contract, account?.address])
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
@@ -69,16 +68,26 @@ export default function Home() {
                       History
                     </Button>
                   </Link>
-                  <Link href="/admin">
-                    <Button variant="ghost" size="sm" className="gap-2">
-                      <Settings className="h-4 w-4" />
-                      Admin
-                    </Button>
-                  </Link>
+                  {isOwner && (
+                    <Link href="/admin">
+                      <Button variant="ghost" size="sm" className="gap-2">
+                        <Settings className="h-4 w-4" />
+                        Admin
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <WalletConnection />
+                <ConnectButton
+                  client={client}
+                  chains={supportedChains}
+                  appMetadata={{
+                    name: "ChainChaos",
+                    url: "https://chainchaos.com",
+                    description: "A prediction market for Ethereum gas prices on Etherlink",
+                  }}
+                />
               </div>
             </div>
           </div>
@@ -90,7 +99,14 @@ export default function Home() {
           <WinnerNotifications />
           
           {/* Current Bet */}
-          <CurrentBet />
+          {contract ? <CurrentBet /> : 
+                <Alert className="max-w-md mx-auto border-red-500/20 bg-red-500/5">
+                <AlertTriangle className="h-4 w-4 text-red-500" />
+                <AlertDescription>
+                  Contract not available on {getEtherlinkChainName(chainId)}.
+                </AlertDescription>
+              </Alert>
+              }
         </main>
 
         {/* Footer */}

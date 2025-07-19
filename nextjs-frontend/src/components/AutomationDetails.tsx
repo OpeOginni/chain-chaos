@@ -1,11 +1,11 @@
 'use client'
 
-import { useReadContract } from 'wagmi'
+import { useReadContract } from 'thirdweb/react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ChainChaosABI } from '@/blockchain/ChainChaosABI'
-import { BetAutomationData, getChainChaosAddress } from '@/lib/wagmi'
+import { getChainChaosAddress, getChainChaosContract } from '@/lib/thirdweb'
 import { ChevronDown, ChevronRight, Bot, Calculator, Hash, Clock } from 'lucide-react'
 import { useState } from 'react'
 
@@ -19,15 +19,16 @@ export function AutomationDetails({ betId, chainId, isSettled = false }: Automat
   const [isOpen, setIsOpen] = useState(false)
   const chainChaosAddress = getChainChaosAddress(chainId)
 
+  const chainChaosContract = getChainChaosContract(chainId)
+
   const { data: automationData, isLoading } = useReadContract({
-    address: chainChaosAddress,
-    abi: ChainChaosABI,
-    functionName: 'getBetAutomationData',
-    args: [betId],
-    query: {
+    contract: chainChaosContract!,
+    method: 'getBetAutomationData',
+    params: [betId],
+    queryOptions: {
       enabled: !!chainChaosAddress,
     },
-  }) as { data: BetAutomationData | undefined; isLoading: boolean }
+  })
 
   if (isLoading) {
     return (
@@ -38,7 +39,15 @@ export function AutomationDetails({ betId, chainId, isSettled = false }: Automat
     )
   }
 
-  if (!automationData?.isAutomated) {
+  const returnedAutomationData = {
+    startBlockHeight: automationData?.[0],
+    endBlockHeight: automationData?.[1],
+    sampledBlocks: automationData?.[2],
+    calculationMethod: automationData?.[3],
+    isAutomated: automationData?.[4],
+  }
+
+  if (!returnedAutomationData.isAutomated) {
     return (
       <Badge variant="outline" className="text-xs">
         <Bot className="h-3 w-3 mr-1" />
@@ -84,7 +93,7 @@ export function AutomationDetails({ betId, chainId, isSettled = false }: Automat
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-xs text-muted-foreground">
-                {automationData.calculationMethod}
+                {returnedAutomationData.calculationMethod}
               </p>
               
               <div className="grid grid-cols-1 gap-3 text-xs">
@@ -93,31 +102,31 @@ export function AutomationDetails({ betId, chainId, isSettled = false }: Automat
                     <Hash className="h-3 w-3" />
                     Start Block
                   </span>
-                  <span className="font-mono">{formatBlockHeight(automationData.startBlockHeight)}</span>
+                  <span className="font-mono">{formatBlockHeight(returnedAutomationData.startBlockHeight!)}</span>
                 </div>
                 
-                {isSettled && automationData.endBlockHeight > 0 && (
+                {isSettled && returnedAutomationData.endBlockHeight && returnedAutomationData.endBlockHeight > 0 && (
                   <div className="flex items-center justify-between">
                     <span className="flex items-center gap-1 text-muted-foreground">
                       <Hash className="h-3 w-3" />
                       End Block
                     </span>
-                    <span className="font-mono">{formatBlockHeight(automationData.endBlockHeight)}</span>
+                    <span className="font-mono">{formatBlockHeight(returnedAutomationData.endBlockHeight)}</span>
                   </div>
                 )}
                 
-                {isSettled && automationData.sampledBlocks.length > 0 && (
+                {isSettled && returnedAutomationData.sampledBlocks && returnedAutomationData.sampledBlocks.length > 0 && (
                   <div className="space-y-1">
                     <div className="text-muted-foreground">Sampled Blocks:</div>
                     <div className="font-mono text-xs bg-muted/50 rounded p-2">
-                      {formatBlocksList(automationData.sampledBlocks)}
+                      {formatBlocksList(returnedAutomationData.sampledBlocks.slice())}
                     </div>
                   </div>
                 )}
                 
-                {isSettled && automationData.sampledBlocks.length === 0 && automationData.endBlockHeight > 0 && (
+                {isSettled && returnedAutomationData.sampledBlocks && returnedAutomationData.sampledBlocks.length === 0 && returnedAutomationData.endBlockHeight && returnedAutomationData.endBlockHeight > 0 && (
                   <div className="text-xs text-muted-foreground">
-                    All blocks from {formatBlockHeight(automationData.startBlockHeight)} to {formatBlockHeight(automationData.endBlockHeight)} were used
+                    All blocks from {formatBlockHeight(returnedAutomationData.startBlockHeight!)} to {formatBlockHeight(returnedAutomationData.endBlockHeight!)} were used
                   </div>
                 )}
               </div>

@@ -1,14 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useAccount } from 'wagmi'
+import { useActiveAccount } from "thirdweb/react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { formatEther, formatUSDC, formatBetCategory } from '@/lib/utils'
 import { TokenIcon, getTokenSymbol } from '@/components/ui/TokenIcon'
-import { CurrencyType } from '@/lib/wagmi'
+import { CurrencyType } from '@/lib/types'
 import { Gift, X, ExternalLink, Bell, Trophy } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -28,7 +28,9 @@ interface WinnerNotificationsProps {
 }
 
 export function WinnerNotifications({ onClaimSuccess }: WinnerNotificationsProps) {
-  const { address, isConnected } = useAccount()
+  const account = useActiveAccount()
+  const isConnected = !!account
+  const address = account?.address
   const [notifications, setNotifications] = useState<WinnerNotification[]>([])
   const [loading, setLoading] = useState(false)
   const [dismissing, setDismissing] = useState<string | null>(null)
@@ -86,7 +88,7 @@ export function WinnerNotifications({ onClaimSuccess }: WinnerNotificationsProps
 
   const formatAmount = (amount: string, currencyType: number) => {
     const value = BigInt(amount)
-    return currencyType === CurrencyType.NATIVE 
+    return currencyType === CurrencyType.XTZ 
       ? formatEther(value)
       : formatUSDC(value)
   }

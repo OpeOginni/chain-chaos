@@ -11,7 +11,7 @@ import {
   etherlinkMainnet, 
   etherlinkTestnet,
   areAddressesAvailable 
-} from '@/lib/wagmi'
+} from '@/lib/thirdweb'
 import { AlertTriangle, CheckCircle, Wifi, ExternalLink, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 

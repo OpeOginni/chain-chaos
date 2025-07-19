@@ -19,11 +19,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ChainChaosABI } from '@/blockchain/ChainChaosABI'
 import { 
-  CurrencyType,
   getChainChaosAddress,
   areAddressesAvailable,
   isEtherlinkChain 
-} from '@/lib/wagmi'
+} from '@/lib/thirdweb'
+import { CurrencyType } from '@/lib/types'
 import { TokenIcon, getTokenSymbol } from '@/components/ui/TokenIcon'
 import { Loader2, AlertTriangle, CheckCircle } from 'lucide-react'
 import { toast } from 'sonner'
@@ -86,7 +86,7 @@ export function CreateBetDialog({ children, onBetCreated }: CreateBetDialogProps
       const currencyTypeNum = parseInt(currencyType) as CurrencyType
       let amount: bigint
 
-      if (currencyTypeNum === CurrencyType.NATIVE) {
+      if (currencyTypeNum === CurrencyType.XTZ) {
         amount = parseEther(betAmount)
       } else {
         amount = parseUnits(betAmount, 6) // USDC has 6 decimals
@@ -173,10 +173,10 @@ export function CreateBetDialog({ children, onBetCreated }: CreateBetDialogProps
                   <SelectValue placeholder="Select currency" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={CurrencyType.NATIVE.toString()}>
+                  <SelectItem value={CurrencyType.XTZ.toString()}>
                     <div className="flex items-center gap-2">
-                      <TokenIcon currencyType={CurrencyType.NATIVE} size={16} />
-                      {getTokenSymbol(CurrencyType.NATIVE)} (XTZ)
+                      <TokenIcon currencyType={CurrencyType.XTZ} size={16} />
+                      {getTokenSymbol(CurrencyType.XTZ)} (XTZ)
                     </div>
                   </SelectItem>
                   <SelectItem value={CurrencyType.USDC.toString()}>

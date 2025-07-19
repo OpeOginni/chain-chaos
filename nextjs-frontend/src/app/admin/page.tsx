@@ -13,12 +13,12 @@ import { EtherlinkLogo } from '@/components/ui/EtherlinkLogo'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChainChaosABI } from '@/blockchain/ChainChaosABI'
 import { 
-  BetInfo,
   getChainChaosAddress,
   areAddressesAvailable,
   isEtherlinkChain,
   getEtherlinkChainName 
-} from '@/lib/wagmi'
+} from '@/lib/thirdweb'
+import { BetInfo } from '@/lib/types'
 import { Settings, Plus, TrendingUp, Clock, Shield, DollarSign, AlertTriangle, Home } from 'lucide-react'
 
 export default function AdminPage() {
@@ -103,7 +103,6 @@ export default function AdminPage() {
   }
 
   if (!isConnected) {
-    console.log('isConnected', isConnected)
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-background/95">
         <div className="container mx-auto px-4 py-8">
@@ -192,11 +191,6 @@ export default function AdminPage() {
   }
 
   if (ownerError || !isOwner) {
-    console.log('ownerError', ownerError)
-    console.log('isOwner', isOwner)
-    console.log('owner', owner)
-    console.log('address', address)
-
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-background/95">
         <div className="container mx-auto px-4 py-8">

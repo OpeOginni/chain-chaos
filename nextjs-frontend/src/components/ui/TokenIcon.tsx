@@ -1,5 +1,5 @@
 import Image from 'next/image'
-import { CurrencyType } from '@/lib/wagmi'
+import { CurrencyType } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 interface TokenIconProps {
@@ -11,7 +11,7 @@ interface TokenIconProps {
 export function TokenIcon({ currencyType, size = 20, className }: TokenIconProps) {
   const getTokenInfo = (type: CurrencyType) => {
     switch (type) {
-      case CurrencyType.NATIVE:
+      case CurrencyType.XTZ:
         return {
           src: '/token/xtz.svg',
           alt: 'XTZ Token',
@@ -48,7 +48,7 @@ export function TokenIcon({ currencyType, size = 20, className }: TokenIconProps
 // Export a simple function to get token symbol
 export function getTokenSymbol(currencyType: CurrencyType): string {
   switch (currencyType) {
-    case CurrencyType.NATIVE:
+    case CurrencyType.XTZ:
       return 'XTZ'
     case CurrencyType.USDC:
       return 'USDC'

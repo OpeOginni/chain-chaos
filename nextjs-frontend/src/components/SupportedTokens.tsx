@@ -1,14 +1,15 @@
 'use client'
 
-import { Card, CardContent } from '@/components/ui/card'
-import { TokenIcon } from '@/components/ui/TokenIcon'
-import { CurrencyType } from '@/lib/wagmi'
+import React from 'react'
 import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { CurrencyType } from '@/lib/types'
+import { TokenIcon, getTokenSymbol } from '@/components/ui/TokenIcon'
 
 export function SupportedTokens() {
   const tokens = [
     {
-      type: CurrencyType.NATIVE,
+      type: CurrencyType.XTZ,
       symbol: 'XTZ',
       name: 'Tezos',
       description: 'Native blockchain currency'

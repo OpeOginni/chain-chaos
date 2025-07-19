@@ -38,6 +38,46 @@ export const fetchBaselineData = async (category: string, chainId: number): Prom
 } | null> => {
   try {
     switch (category) {
+      case 'base_fee_per_gas': {
+        const gasPrice = await makeRpcCall(chainId, 'eth_gasPrice')
+        const gasPriceWei = hexToDecimal(gasPrice)
+        return {
+          value: gasPriceWei.toString(),
+          unit: 'wei',
+          label: 'Current Base Fee Per Gas'
+        }
+      }
+
+      case 'gas_used': {
+        const latestBlock = await makeRpcCall(chainId, 'eth_getBlockByNumber', ['latest', false])
+        const gasUsedWei = hexToDecimal(latestBlock.gasUsed)
+        const avgBlockTime = 15 // seconds
+        const blocksIn5Min = Math.floor((5 * 60) / avgBlockTime)
+        const estimatedTotal = gasUsedWei * blocksIn5Min
+        
+        return {
+          value: estimatedTotal.toString(),
+          unit: 'wei',
+          label: 'Est. Gas Used (5min)'
+        }
+      }
+
+      case 'burnt_fees': {
+        const latestBlock = await makeRpcCall(chainId, 'eth_getBlockByNumber', ['latest', false])
+        const baseFeeWei = hexToDecimal(latestBlock.baseFeePerGas || '0')
+        const gasUsedWei = hexToDecimal(latestBlock.gasUsed)
+        const burntFeesWei = baseFeeWei * gasUsedWei
+        const avgBlockTime = 15 // seconds
+        const blocksIn5Min = Math.floor((5 * 60) / avgBlockTime)
+        const estimatedTotal = burntFeesWei * blocksIn5Min
+        
+        return {
+          value: estimatedTotal.toString(),
+          unit: 'wei',
+          label: 'Est. Burnt Fees (5min)'
+        }
+      }
+
       case 'gas_price': {
         const gasPrice = await makeRpcCall(chainId, 'eth_gasPrice')
         const gasPriceGwei = weiToGwei(gasPrice)
@@ -128,16 +168,26 @@ export const formatBetCategoryName = (category: string): string => {
 
 // Get helpful prediction hints
 export const getPredictionHint = (category: string): string => {
-  const hints = {
-    gas_price: 'Gas prices fluctuate based on network congestion. Consider recent trends.',
-    block_count: 'Etherlink averages ~15 second block times. Account for any network variations.',
-    transaction_count: 'Transaction volume varies by time of day and network activity.',
-    network_activity: 'Score based on gas usage ratio (0-100). Higher activity = higher score.',
-    block_height: 'Predict the exact block number that will be reached.',
-    xtz_price: 'Predict price movement in basis points over the next period.',
-    etherlink_tps: 'Transactions per second can vary significantly with network load.'
+  switch (category) {
+    case 'base_fee_per_gas':
+      return 'Predict the average base fee per gas in wei over the next 5 minutes'
+    case 'gas_used':
+      return 'Predict total gas used in wei across all sampled blocks in 5 minutes'
+    case 'burnt_fees':
+      return 'Predict total burnt fees in wei from sampled blocks in 5 minutes'
+    case 'gas_price':
+      return 'Current gas price tends to fluctuate based on network demand'
+    case 'block_count':
+      return 'Etherlink produces blocks roughly every 15 seconds'
+    case 'transaction_count':
+      return 'Transaction volume varies by time of day and network activity'
+    case 'network_activity':
+      return 'Score from 1-100 based on gas usage vs gas limit ratio'
+    case 'block_height':
+      return 'Block height increases consistently over time'
+    case 'xtz_price':
+      return 'XTZ price in USD cents - highly volatile!'
+    default:
+      return 'Make your best prediction based on current market conditions'
   }
-  
-  return hints[category as keyof typeof hints] || 
-         'Make your best prediction based on current network conditions.'
 } 

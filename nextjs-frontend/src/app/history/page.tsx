@@ -3,9 +3,10 @@
 import { BetHistory } from '@/components/BetHistory'
 import { Button } from '@/components/ui/button'
 import { EtherlinkLogo } from '@/components/ui/EtherlinkLogo'
-import { WalletConnection } from '@/components/WalletConnection'
-import { NetworkStatus } from '@/components/NetworkStatus'
 import { ArrowLeft, Gamepad2 } from 'lucide-react'
+import { ConnectButton } from 'thirdweb/react'
+import { client } from '@/lib/client'
+import { supportedChains } from '@/lib/thirdweb'
 
 export default function HistoryPage() {
   return (
@@ -24,7 +25,17 @@ export default function HistoryPage() {
             </div>
             
             <div className="flex items-center gap-3">
-              <WalletConnection />
+            <div className="flex items-center gap-4">
+                <ConnectButton
+                  client={client}
+                  chains={supportedChains}
+                  appMetadata={{
+                    name: "ChainChaos",
+                    url: "https://chainchaos.com",
+                    description: "A prediction market for Ethereum gas prices on Etherlink",
+                  }}
+                />
+              </div>
               <Button 
                 variant="outline" 
                 onClick={() => window.location.href = '/'}
