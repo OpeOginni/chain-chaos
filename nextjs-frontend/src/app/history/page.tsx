@@ -3,6 +3,8 @@
 import { BetHistory } from '@/components/BetHistory'
 import { Button } from '@/components/ui/button'
 import { EtherlinkLogo } from '@/components/ui/EtherlinkLogo'
+import { WalletConnection } from '@/components/WalletConnection'
+import { NetworkStatus } from '@/components/NetworkStatus'
 import { ArrowLeft, Gamepad2 } from 'lucide-react'
 
 export default function HistoryPage() {
@@ -22,6 +24,8 @@ export default function HistoryPage() {
             </div>
             
             <div className="flex items-center gap-3">
+              <NetworkStatus />
+              <WalletConnection />
               <Button 
                 variant="outline" 
                 onClick={() => window.location.href = '/'}

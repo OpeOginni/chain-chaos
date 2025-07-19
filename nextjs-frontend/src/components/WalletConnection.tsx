@@ -1,6 +1,8 @@
 'use client'
 
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { useWalletConnection } from '@/hooks/useWalletConnection'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -17,9 +19,10 @@ import { Wallet, ChevronDown, Copy, ExternalLink, LogOut, User } from 'lucide-re
 import { toast } from 'sonner'
 
 export function WalletConnection() {
-  const { address, isConnected, chain } = useAccount()
-  const { connectors, connect, isPending } = useConnect()
+  const { address, chain } = useAccount()
+  const { isConnected, isHydrated, connectors, connect } = useWalletConnection()
   const { disconnect } = useDisconnect()
+  const [isPending, setIsPending] = useState(false)
 
   const copyAddress = () => {
     if (address) {
@@ -64,6 +67,28 @@ export function WalletConnection() {
     }
     
     return 'secondary' // Other networks
+  }
+
+  // Handle connecting state
+  const handleConnect = async (connector: any) => {
+    setIsPending(true)
+    try {
+      await connect({ connector })
+    } catch (error) {
+      console.error('Failed to connect:', error)
+    } finally {
+      setIsPending(false)
+    }
+  }
+
+  // Don't render until hydrated to prevent hydration mismatch
+  if (!isHydrated) {
+    return (
+      <Button disabled className="flex items-center gap-2">
+        <Wallet className="h-4 w-4" />
+        Loading...
+      </Button>
+    )
   }
 
   if (isConnected && address) {
@@ -128,7 +153,7 @@ export function WalletConnection() {
         {connectors.map((connector) => (
           <DropdownMenuItem
             key={connector.uid}
-            onClick={() => connect({ connector })}
+            onClick={() => handleConnect(connector)}
             disabled={isPending}
             className="flex items-center gap-2"
           >

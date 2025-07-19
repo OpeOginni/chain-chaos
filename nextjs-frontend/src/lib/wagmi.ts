@@ -1,4 +1,4 @@
-import { createConfig, http } from 'wagmi'
+import { createConfig, http, createStorage, cookieStorage } from 'wagmi'
 import { mainnet, sepolia, hardhat } from 'wagmi/chains'
 import { coinbaseWallet, injected, metaMask, walletConnect } from 'wagmi/connectors'
 import { defineChain } from 'viem'
@@ -99,10 +99,19 @@ export const config = createConfig({
   chains: [etherlinkMainnet, etherlinkTestnet, sepolia, hardhat],
   connectors: [
     injected(),
-    coinbaseWallet(),
+    coinbaseWallet({
+      appName: 'ChainChaos',
+      appLogoUrl: 'https://chainchaos.app/logo.png',
+    }),
     metaMask(),
     walletConnect({ 
-      projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID || '1' 
+      projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID || '1',
+      metadata: {
+        name: 'ChainChaos',
+        description: 'Etherlink Prediction Markets',
+        url: 'https://chainchaos.app',
+        icons: ['https://chainchaos.app/logo.png']
+      }
     }),
   ],
   transports: {
@@ -111,6 +120,10 @@ export const config = createConfig({
     [sepolia.id]: http(),
     [hardhat.id]: http('http://127.0.0.1:8545'),
   },
+  storage: createStorage({
+    storage: cookieStorage,
+  }),
+  ssr: true,
 })
 
 // Legacy exports for backward compatibility - these will use the first available network
@@ -143,6 +156,14 @@ export type BetInfo = {
   createdAt: bigint
   startTime: bigint
   endTime: bigint
+}
+
+export type BetAutomationData = {
+  startBlockHeight: bigint
+  endBlockHeight: bigint
+  sampledBlocks: bigint[]
+  calculationMethod: string
+  isAutomated: boolean
 }
 
 export type PlayerBet = {

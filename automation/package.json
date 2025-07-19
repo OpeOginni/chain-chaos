@@ -1,20 +1,30 @@
 {
-  "name": "chainchaos-automation",
+  "name": "chain-chaos-automation",
   "version": "1.0.0",
-  "description": "Automated betting cycle management for ChainChaos",
-  "main": "betting-cron.js",
+  "description": "Standalone automation service for Chain Chaos betting",
+  "main": "dist/index.js",
+  "type": "module",
   "scripts": {
-    "start": "node betting-cron.js",
-    "test": "node betting-cron.js",
-    "deploy:vercel": "vercel --prod",
-    "deploy:aws": "serverless deploy"
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "test": "node --test",
+    "test:api": "node test-api.js",
+    "docker:build": "docker build -t chain-chaos-automation .",
+    "docker:run": "docker run --env-file .env chain-chaos-automation"
   },
   "dependencies": {
-    "ethers": "^6.8.0"
+    "ethers": "^6.8.0",
+    "dotenv": "^16.3.1",
+    "node-cron": "^3.0.2",
+    "redis": "^4.6.8"
   },
   "devDependencies": {
-    "serverless": "^3.34.0",
-    "serverless-offline": "^12.0.4"
+    "@types/node": "^20.8.0",
+    "@types/node-cron": "^3.0.8",
+    "@types/redis": "^4.0.11",
+    "typescript": "^5.2.2",
+    "tsx": "^3.14.0"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -28,4 +38,4 @@
   ],
   "author": "ChainChaos Team",
   "license": "MIT"
-} 
+}

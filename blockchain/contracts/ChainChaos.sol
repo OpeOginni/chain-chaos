@@ -60,6 +60,12 @@ contract ChainChaos is Ownable {
         uint256 createdAt;
         uint256 startTime; // When betting starts (informational)
         uint256 endTime; // When betting ends (informational)
+        // Automation metadata
+        uint256 startBlockHeight; // Block height when bet started
+        uint256 endBlockHeight; // Block height when bet ended
+        uint256[] sampledBlocks; // Blocks sampled for calculation (if applicable)
+        string calculationMethod; // Description of how result was calculated
+        bool isAutomated; // Whether this bet was created/settled automatically
     }
 
     uint256 public constant OWNER_FEE_PERCENT = 5; // 5% owner fee
@@ -139,6 +145,71 @@ contract ChainChaos is Ownable {
                 startTime,
                 endTime
             );
+    }
+
+    /// @notice Create an automated bet with metadata (owner only)
+    /// @param category The prediction category
+    /// @param description Human readable description
+    /// @param currencyType Currency type (NATIVE or USDC)
+    /// @param betAmount Fixed bet amount in wei/smallest unit
+    /// @param startTime Start time
+    /// @param endTime End time
+    /// @param startBlockHeight Block height when bet started
+    /// @param calculationMethod Description of calculation method
+    function createAutomatedBet(
+        string memory category,
+        string memory description,
+        CurrencyType currencyType,
+        uint256 betAmount,
+        uint256 startTime,
+        uint256 endTime,
+        uint256 startBlockHeight,
+        string memory calculationMethod
+    ) external onlyOwner returns (uint256) {
+        uint256 betId = _createBet(
+            category,
+            description,
+            currencyType,
+            betAmount,
+            startTime,
+            endTime
+        );
+
+        // Add automation metadata
+        Bet storage bet = bets[betId];
+        bet.startBlockHeight = startBlockHeight;
+        bet.calculationMethod = calculationMethod;
+        bet.isAutomated = true;
+
+        return betId;
+    }
+
+    /// @notice Settle an automated bet with full metadata (owner only)
+    /// @param betId The bet ID to settle
+    /// @param actualValue The calculated result value
+    /// @param endBlockHeight Block height when calculation ended
+    /// @param sampledBlocks Array of block numbers that were sampled (if applicable)
+    /// @param calculationDetails Description of how the result was calculated
+    function settleAutomatedBet(
+        uint256 betId,
+        uint256 actualValue,
+        uint256 endBlockHeight,
+        uint256[] memory sampledBlocks,
+        string memory calculationDetails
+    ) external onlyOwner {
+        Bet storage bet = bets[betId];
+
+        if (bet.status != BetStatus.ACTIVE) {
+            revert BetAlreadySettled();
+        }
+
+        // Add automation metadata
+        bet.endBlockHeight = endBlockHeight;
+        bet.sampledBlocks = sampledBlocks;
+        bet.calculationMethod = calculationDetails;
+
+        // Settle the bet
+        _settleBet(betId, actualValue);
     }
 
     /// @notice Internal function to create a bet
@@ -498,28 +569,71 @@ contract ChainChaos is Ownable {
         }
     }
 
-    /// @notice Check if betting is currently allowed for a specific bet
+    /// @notice Check if betting is currently active (considering cutoff period)
     /// @param betId The bet ID to check
-    /// @return isActive True if betting is allowed, false if bet is settled/cancelled or in cutoff period
-    function isBettingActive(
-        uint256 betId
-    ) external view returns (bool isActive) {
+    /// @return Whether betting is currently active
+    function isBettingActive(uint256 betId) external view returns (bool) {
         Bet storage bet = bets[betId];
 
-        // Bet must be active
         if (bet.status != BetStatus.ACTIVE) {
             return false;
         }
 
-        // Check if we're within the betting cutoff period
-        if (
-            bet.endTime > 0 &&
-            block.timestamp >= (bet.endTime - BETTING_CUTOFF_PERIOD)
-        ) {
-            return false;
+        // If no end time is set, betting is active
+        if (bet.endTime == 0) {
+            return true;
         }
 
-        return true;
+        // Check if we're in the cutoff period
+        return block.timestamp <= (bet.endTime - BETTING_CUTOFF_PERIOD);
+    }
+
+    /// @notice Get automation metadata for a bet
+    /// @param betId The bet ID
+    /// @return startBlockHeight Block height when bet started
+    /// @return endBlockHeight Block height when bet ended
+    /// @return sampledBlocks Array of sampled block numbers
+    /// @return calculationMethod Description of calculation method
+    /// @return isAutomated Whether the bet was automated
+    function getBetAutomationData(
+        uint256 betId
+    )
+        external
+        view
+        returns (
+            uint256 startBlockHeight,
+            uint256 endBlockHeight,
+            uint256[] memory sampledBlocks,
+            string memory calculationMethod,
+            bool isAutomated
+        )
+    {
+        Bet storage bet = bets[betId];
+        return (
+            bet.startBlockHeight,
+            bet.endBlockHeight,
+            bet.sampledBlocks,
+            bet.calculationMethod,
+            bet.isAutomated
+        );
+    }
+
+    /// @notice Get sampled blocks for a bet (convenience function)
+    /// @param betId The bet ID
+    /// @return Array of sampled block numbers
+    function getBetSampledBlocks(
+        uint256 betId
+    ) external view returns (uint256[] memory) {
+        return bets[betId].sampledBlocks;
+    }
+
+    /// @notice Get all player bets for a specific bet
+    /// @param betId The bet ID
+    /// @return Array of player bets (address, guess, claimed)
+    function getBetPlayerBets(
+        uint256 betId
+    ) external view returns (PlayerBet[] memory) {
+        return bets[betId].playerBets;
     }
 
     /// @notice Internal helper to determine winners (closest guesses)

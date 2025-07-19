@@ -1,13 +1,7 @@
 {
-  "functions": {
-    "betting-cron.js": {
-      "runtime": "nodejs20.x",
-      "maxDuration": 30
-    }
-  },
   "crons": [
     {
-      "path": "/api/cycle",
+      "path": "/api/automation",
       "schedule": "*/5 * * * *"
     }
   ],

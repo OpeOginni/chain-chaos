@@ -8,19 +8,35 @@
 **ChainChaos** is a fun, weird, and totally unexpected betting game built on **Etherlink**.  
 Players place bets on the most unpredictable, quirky metrics of the Etherlink blockchain — like how much gas the chain will burn in the next 5 minutes, how many transactions will fly through in the next 10 blocks, or how long the next streak of empty blocks will be.  
 
-It’s part casino, part chain explorer, part chaos — and 100% fun.  
+It's part casino, part chain explorer, part chaos — and 100% fun.  
 
 We believe that every block tells a story — and now you can bet on it.
+
+## 🤖 Automated Betting System
+
+ChainChaos features a **fully automated betting system** that:
+
+- **Creates new bets every 5 minutes** with random categories
+- **Fetches real blockchain data** from Etherlink Explorer API
+- **Uses anti-manipulation techniques** like random block sampling
+- **Provides full transparency** with on-chain calculation metadata
+- **Integrates XTZ price data** from CoinGecko for price betting
+
+### Betting Categories:
+- 🔥 **Base Fee Sum**: Total base fee per gas over 5 minutes
+- 💸 **Burnt Fees**: Sum from 40-60 randomly sampled blocks  
+- ⛽ **Gas Used**: Total gas consumption from random samples
+- 💰 **XTZ Price**: Real-time price in USD cents
 
 ---
 
 ## 🎯 Why we built this
 
-Blockchains aren’t just about price charts.  
-They’re alive, with their own unique rhythm and patterns.  
+Blockchains aren't just about price charts.  
+They're alive, with their own unique rhythm and patterns.  
 We wanted to build something that:  
 
-✅ Showcases Etherlink’s performance & accessibility.  
+✅ Showcases Etherlink's performance & accessibility.  
 ✅ Brings fresh liquidity and users into the ecosystem.  
 ✅ Makes people pay attention to the inner life of the chain.  
 ✅ Feels bold, original, and just plain fun.  
@@ -73,7 +89,7 @@ So we made ChainChaos — the game where the *chain itself is the game.*
 We see ChainChaos growing into a full-fledged on-chain gaming platform:
 - Weekly tournaments
 - NFT-based player achievements
-- Community-submitted “chaotic metrics”
+- Community-submitted "chaotic metrics"
 - Fully decentralized oracle network
 
 But it all starts here — at this hackathon.

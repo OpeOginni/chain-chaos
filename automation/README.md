@@ -1,4 +1,292 @@
-# ChainChaos Automation System
+# Chain Chaos Automation Service
+
+A standalone Node.js service that creates and settles bets automatically every 5 minutes using real Etherlink blockchain data.
+
+## How It Works
+
+1. **Automated Bet Creation**: Every 5 minutes, the service creates a new bet with a random category:
+   - `base_fee_per_gas`: Sum of base fee per gas over 5 minutes
+   - `burnt_fees`: Total burnt fees from 40-60 randomly sampled blocks
+   - `gas_used`: Total gas used from 40-60 randomly sampled blocks  
+   - `xtz_price`: XTZ price in USD cents at settlement time
+
+2. **Data Collection**: 
+   - Fetches block data from Etherlink Explorer API
+   - Uses CoinGecko API for XTZ price data
+   - Records all calculation methods and sampled blocks for transparency
+
+3. **Automated Settlement**: When a bet's 5-minute window ends:
+   - Calculates the actual result using the specified method
+   - Stores metadata about which blocks were sampled
+   - Settles the bet on the smart contract
+
+## Quick Start
+
+### Prerequisites
+- Node.js 18+ 
+- npm or yarn
+- Contract deployed on Etherlink
+- Private key with ETH for gas fees
+
+### Environment Setup
+
+Create a `.env` file:
+
+```bash
+# Network Configuration
+IS_TESTNET=false  # Set to 'true' for testnet, 'false' for mainnet
+
+# Required - Common
+AUTOMATION_PRIVATE_KEY=your_private_key_here
+
+# Required - Mainnet (when IS_TESTNET=false)
+CHAIN_CHAOS_CONTRACT_ADDRESS=your_mainnet_contract_address_here
+
+# Required - Testnet (when IS_TESTNET=true)  
+CHAIN_CHAOS_TESTNET_CONTRACT_ADDRESS=your_testnet_contract_address_here
+
+# Optional - Network RPC URLs
+ETHERLINK_RPC_URL=https://node.mainnet.etherlink.com
+ETHERLINK_TESTNET_RPC_URL=https://node.ghostnet.etherlink.com
+
+# Optional - Redis and Debug
+REDIS_URL=redis://localhost:6379
+DEBUG=false
+```
+
+### Network Switching
+
+The automation service supports both Etherlink mainnet and testnet:
+
+#### Mainnet Deployment
+```bash
+# Set environment
+export IS_TESTNET=false
+export CHAIN_CHAOS_CONTRACT_ADDRESS=your_mainnet_contract
+
+# Run service
+npm start
+```
+
+#### Testnet Deployment  
+```bash
+# Set environment
+export IS_TESTNET=true
+export CHAIN_CHAOS_TESTNET_CONTRACT_ADDRESS=your_testnet_contract
+
+# Run service
+npm start
+```
+
+#### Docker Deployment
+```bash
+# For mainnet
+IS_TESTNET=false CHAIN_CHAOS_CONTRACT_ADDRESS=0x... docker-compose up
+
+# For testnet  
+IS_TESTNET=true CHAIN_CHAOS_TESTNET_CONTRACT_ADDRESS=0x... docker-compose up
+```
+
+### Data Separation
+
+The service automatically separates data between networks:
+
+- **Redis Keys**: Uses `mainnet:` and `testnet:` prefixes
+- **Block APIs**: Uses appropriate explorer endpoints
+- **Contract Addresses**: Validates correct contract per network
+- **Logging**: Clearly identifies which network is active
+
+### Installation & Running
+
+```bash
+# Install dependencies
+npm install
+
+# Build the service
+npm run build
+
+# Run in development mode (with hot reload)
+npm run dev
+
+# Run in production mode
+npm start
+
+# Run one cycle immediately then continue normally
+npm start -- --run-now
+```
+
+## Deployment Options
+
+### 1. Direct Node.js
+
+```bash
+# Production deployment
+npm install --production
+npm run build
+npm start
+```
+
+### 2. Docker
+
+```bash
+# Build and run with Docker
+docker build -t chain-chaos-automation .
+docker run --env-file .env -d --name chain-chaos-automation chain-chaos-automation
+
+# Check logs
+docker logs -f chain-chaos-automation
+```
+
+### 3. Docker Compose
+
+```bash
+# Start with docker-compose
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop service
+docker-compose down
+```
+
+### 4. Process Manager (PM2)
+
+```bash
+# Install PM2
+npm install -g pm2
+
+# Start with PM2
+pm2 start dist/index.js --name "chain-chaos-automation"
+
+# Monitor
+pm2 monit
+
+# Logs
+pm2 logs chain-chaos-automation
+```
+
+## Service Architecture
+
+```
+automation/
+├── src/
+│   ├── index.ts                 # Main entry point
+│   ├── services/
+│   │   ├── AutomationService.ts # Core automation logic
+│   │   ├── ContractService.ts   # Smart contract interactions
+│   │   └── BlockchainDataService.ts # Blockchain data fetching
+│   └── utils/
+│       └── Logger.ts            # Logging utility
+├── dist/                        # Compiled JavaScript
+├── Dockerfile                   # Docker configuration
+├── docker-compose.yml          # Docker Compose setup
+└── deploy.sh                   # Deployment script
+```
+
+## Calculation Methods
+
+### Base Fee Per Gas
+- Sums `base_fee_per_gas` from all blocks in the 5-minute range
+- Uses sequential block data for accuracy
+- Transparent and verifiable
+
+### Burnt Fees / Gas Used  
+- Randomly samples 40-60 blocks from the 5-minute range
+- Prevents manipulation while maintaining fairness
+- Records exact blocks sampled for verification
+
+### XTZ Price
+- Fetches current XTZ/USD price from CoinGecko
+- Converts to cents (multiplies by 100)
+- Captured at settlement time for fairness
+
+## Monitoring & Logging
+
+The service provides comprehensive logging:
+
+```bash
+# View logs in real-time
+tail -f logs/automation.log
+
+# Check service health
+curl http://localhost:3000/health  # If health endpoint is enabled
+
+# Monitor with Docker
+docker logs -f chain-chaos-automation
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Environment Variables Missing**
+   ```bash
+   Error: Missing required environment variables
+   ```
+   Solution: Check your `.env` file or environment variable exports
+
+2. **Contract Connection Failed**
+   ```bash
+   Error: Contract health check failed
+   ```
+   Solution: Verify contract address and RPC URL
+
+3. **Insufficient Gas**
+   ```bash
+   Error: insufficient funds for gas
+   ```
+   Solution: Ensure the automation wallet has enough ETH
+
+4. **Block Data Fetch Failed**
+   ```bash
+   Error: Failed to fetch block
+   ```
+   Solution: Check internet connection and Etherlink Explorer API status
+
+### Debug Mode
+
+Enable debug logging:
+
+```bash
+DEBUG=true npm start
+```
+
+## Security Considerations
+
+- **Private Key Security**: Never commit private keys to version control
+- **Environment Isolation**: Use different keys for testnet/mainnet
+- **Access Control**: Only the contract owner can create/settle automated bets
+- **Monitoring**: Set up alerts for failed transactions or service downtime
+
+## Production Deployment
+
+For production, consider:
+
+1. **Process Management**: Use PM2, systemd, or similar
+2. **Monitoring**: Set up log aggregation and alerting
+3. **Backup**: Ensure automation wallet is backed up
+4. **Updates**: Plan for zero-downtime updates
+5. **Scaling**: Service is stateless and can be horizontally scaled
+
+## API Integration
+
+The service can be extended with a REST API for monitoring:
+
+```typescript
+// Optional: Add health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.get('/status', (req, res) => {
+  res.json({ 
+    activeBets: activeBetCount,
+    lastCycle: lastCycleTime,
+    nextCycle: nextCycleTime 
+  });
+});
+```
 
 ## 🎯 Overview
 
@@ -312,3 +600,56 @@ const BET_CATEGORIES = [
 6. **Monitor and optimize** based on usage
 
 This system transforms ChainChaos from a manual prediction market into a **fully automated, continuous gaming experience** that runs 24/7 without intervention! 🎉 
+
+### Winner Notification System
+
+The service includes a Redis-based winner notification system:
+
+- **Automatic Winner Tracking**: When bets are settled, winners are automatically tracked in Redis
+- **Frontend Notifications**: Users see notifications when they have unclaimed rewards
+- **Auto-Cleanup**: Notifications are removed when prizes are claimed or after 30 days
+- **Performance**: Uses Redis for fast notification lookups 
+
+### API Testing
+
+Test the Etherlink APIs before deployment:
+
+```bash
+# Test both mainnet and testnet APIs
+npm run test:api
+
+# Example output:
+# 🧪 Testing: Etherlink Mainnet Blocks API
+# ✅ Status: 200
+# 📊 Items count: 5
+# 🔢 Latest block height: 20620953
+# ⛽ Gas used: 2833050
+# 💸 Burnt fees: 2833050000000000
+# 📈 Base fee per gas: 1000000000
+```
+
+### Block Data Structure
+
+The service fetches block data from Etherlink Explorer API:
+
+```json
+{
+  "items": [
+    {
+      "height": 20620953,
+      "base_fee_per_gas": "1000000000",
+      "burnt_fees": "2833050000000000", 
+      "gas_used": "2833050",
+      "timestamp": "2025-07-19T09:54:51.000000Z",
+      "hash": "0x7ddddc...",
+      "transaction_count": 1
+    }
+  ]
+}
+```
+
+### API Endpoints
+
+- **Mainnet**: `https://explorer.etherlink.com/api/v2/blocks?type=block`
+- **Testnet**: `https://testnet.explorer.etherlink.com/api/v2/blocks?type=block`
+- **Price Data**: `https://api.coingecko.com/api/v3/simple/price?ids=tezos&vs_currencies=usd` 

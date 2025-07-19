@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { useAccount, useReadContract, useChainId } from 'wagmi'
+import { useWalletConnection } from '@/hooks/useWalletConnection'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -12,6 +13,7 @@ import { ChainChaosABI } from '@/blockchain/ChainChaosABI'
 import { 
   BetInfo, 
   BetStatus,
+  CurrencyType,
   getChainChaosAddress,
   areAddressesAvailable,
   isEtherlinkChain,
@@ -24,7 +26,8 @@ interface BetHistoryProps {
 }
 
 export function BetHistory({ onBack }: BetHistoryProps) {
-  const { address, isConnected } = useAccount()
+  const { address } = useAccount()
+  const { isConnected, isHydrated } = useWalletConnection()
   const chainId = useChainId()
   const [expandedBets, setExpandedBets] = useState<Set<string>>(new Set())
 
@@ -39,6 +42,20 @@ export function BetHistory({ onBack }: BetHistoryProps) {
       window.location.href = '/'
     }
   }
+
+  // Get active bets
+  const { 
+    data: activeBetIds, 
+    isLoading: loadingActive 
+  } = useReadContract({
+    address: chainChaosAddress,
+    abi: ChainChaosABI,
+    functionName: 'getActiveBets',
+    query: {
+      enabled: !!chainChaosAddress && addressesAvailable,
+      refetchInterval: 30 * 1000, // Refetch every 30 seconds
+    },
+  })
 
   // Get settled bets
   const { 
@@ -76,10 +93,10 @@ export function BetHistory({ onBack }: BetHistoryProps) {
       id: betData[0],
       category: betData[1],
       description: betData[2],
-      currencyType: betData[3],
+      currencyType: Number(betData[3]) as CurrencyType,
       betAmount: betData[4],
       actualValue: betData[5],
-      status: betData[6],
+      status: Number(betData[6]) as BetStatus,
       totalPot: betData[7],
       refundMode: betData[8],
       playerBetCount: betData[9],
@@ -121,6 +138,19 @@ export function BetHistory({ onBack }: BetHistoryProps) {
     }
   }
 
+  // Combine all bets (active and settled)
+  const allBetIds = useMemo(() => {
+    const active = activeBetIds || []
+    const settled = settledBetIds || []
+    
+    // Combine and deduplicate (in case a bet appears in both lists during transition)
+    const allIds = [...active, ...settled]
+    const uniqueIds = Array.from(new Set(allIds.map(id => id.toString()))).map(id => BigInt(id))
+    
+    // Sort by ID descending (newest first)
+    return uniqueIds.sort((a, b) => Number(b - a))
+  }, [activeBetIds, settledBetIds])
+
   // Count of recent settled bets (individual BetCards will show if user can claim)
   const unclaimedCount = useMemo(() => {
     if (!settledBetIds || !isConnected) return 0
@@ -131,7 +161,7 @@ export function BetHistory({ onBack }: BetHistoryProps) {
   }, [settledBetIds, isConnected])
 
   // Loading state
-  if (loadingSettled) {
+  if (loadingActive || loadingSettled) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-3">
@@ -205,11 +235,16 @@ export function BetHistory({ onBack }: BetHistoryProps) {
         </div>
         
         {/* Recent rounds alert */}
-        {settledBetIds && settledBetIds.length > 0 && isConnected && (
+        {allBetIds && allBetIds.length > 0 && isConnected && (
           <Alert className="border-blue-500/20 bg-blue-500/5 max-w-xs">
             <Trophy className="h-4 w-4 text-blue-500" />
             <AlertDescription className="text-sm">
-              <strong>{settledBetIds.length}</strong> settled round{settledBetIds.length > 1 ? 's' : ''} available
+              <strong>{allBetIds.length}</strong> total round{allBetIds.length > 1 ? 's' : ''} 
+              {settledBetIds && settledBetIds.length > 0 && (
+                <span className="block text-xs opacity-75">
+                  {settledBetIds.length} settled, {(activeBetIds?.length || 0)} active
+                </span>
+              )}
             </AlertDescription>
           </Alert>
         )}
@@ -219,12 +254,17 @@ export function BetHistory({ onBack }: BetHistoryProps) {
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-bold">Prediction History</h2>
         <p className="text-muted-foreground">
-          {settledBetIds?.length || 0} past prediction rounds
+          {allBetIds?.length || 0} total prediction rounds
+          {allBetIds && allBetIds.length > 0 && (
+            <span className="block text-sm">
+              {activeBetIds?.length || 0} active • {settledBetIds?.length || 0} settled
+            </span>
+          )}
         </p>
       </div>
 
       {/* Content */}
-      {!settledBetIds || settledBetIds.length === 0 ? (
+      {!allBetIds || allBetIds.length === 0 ? (
         <div className="text-center py-16 space-y-4">
           <Clock className="h-12 w-12 text-muted-foreground mx-auto" />
           <div>
@@ -245,7 +285,7 @@ export function BetHistory({ onBack }: BetHistoryProps) {
               <Clock className="h-4 w-4" />
               Recent Rounds
               <Badge variant="secondary" className="ml-1">
-                {Math.min(settledBetIds.length, 10)}
+                {Math.min(allBetIds?.length || 0, 20)}
               </Badge>
             </TabsTrigger>
             <TabsTrigger value="rewards" className="flex items-center gap-2">
@@ -261,10 +301,8 @@ export function BetHistory({ onBack }: BetHistoryProps) {
 
           <TabsContent value="recent" className="space-y-4">
             <div className="grid gap-6 max-w-4xl mx-auto">
-              {settledBetIds
-                .slice()
-                .reverse() // Show newest first
-                .slice(0, 20) // Limit to 20 most recent
+              {allBetIds
+                ?.slice(0, 20) // Limit to 20 most recent (already sorted newest first)
                 .map((betId) => (
                   <BetItem key={betId.toString()} betId={betId} />
                 ))}
@@ -272,13 +310,23 @@ export function BetHistory({ onBack }: BetHistoryProps) {
           </TabsContent>
 
           <TabsContent value="rewards" className="space-y-4">
-            {!isConnected ? (
+            {!isConnected && isHydrated ? (
               <div className="text-center py-16 space-y-4">
                 <Trophy className="h-12 w-12 text-muted-foreground mx-auto" />
                 <div>
                   <h3 className="text-lg font-semibold">Connect Your Wallet</h3>
                   <p className="text-muted-foreground">
                     Connect your wallet to see rewards and claim winnings.
+                  </p>
+                </div>
+              </div>
+            ) : !isHydrated ? (
+              <div className="text-center py-16 space-y-4">
+                <Trophy className="h-12 w-12 text-muted-foreground mx-auto animate-pulse" />
+                <div>
+                  <h3 className="text-lg font-semibold">Loading...</h3>
+                  <p className="text-muted-foreground">
+                    Checking wallet connection...
                   </p>
                 </div>
               </div>

@@ -119,11 +119,6 @@ export const ChainChaosABI = [
     "type": "error"
   },
   {
-    "inputs": [],
-    "name": "BettingCutoffPeriod",
-    "type": "error"
-  },
-  {
     "anonymous": false,
     "inputs": [
       {
@@ -313,6 +308,19 @@ export const ChainChaosABI = [
   },
   {
     "inputs": [],
+    "name": "BET_DURATION",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "OWNER_FEE_PERCENT",
     "outputs": [
       {
@@ -412,6 +420,26 @@ export const ChainChaosABI = [
         "internalType": "uint256",
         "name": "endTime",
         "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "startBlockHeight",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "endBlockHeight",
+        "type": "uint256"
+      },
+      {
+        "internalType": "string",
+        "name": "calculationMethod",
+        "type": "string"
+      },
+      {
+        "internalType": "bool",
+        "name": "isAutomated",
+        "type": "bool"
       }
     ],
     "stateMutability": "view",
@@ -474,6 +502,60 @@ export const ChainChaosABI = [
         "internalType": "uint256",
         "name": "endTime",
         "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "startBlockHeight",
+        "type": "uint256"
+      },
+      {
+        "internalType": "string",
+        "name": "calculationMethod",
+        "type": "string"
+      }
+    ],
+    "name": "createAutomatedBet",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "category",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "description",
+        "type": "string"
+      },
+      {
+        "internalType": "enum ChainChaos.CurrencyType",
+        "name": "currencyType",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint256",
+        "name": "betAmount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "startTime",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "endTime",
+        "type": "uint256"
       }
     ],
     "name": "createBet",
@@ -495,6 +577,45 @@ export const ChainChaosABI = [
         "internalType": "uint256[]",
         "name": "",
         "type": "uint256[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "betId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getBetAutomationData",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "startBlockHeight",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "endBlockHeight",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "sampledBlocks",
+        "type": "uint256[]"
+      },
+      {
+        "internalType": "string",
+        "name": "calculationMethod",
+        "type": "string"
+      },
+      {
+        "internalType": "bool",
+        "name": "isAutomated",
+        "type": "bool"
       }
     ],
     "stateMutability": "view",
@@ -587,6 +708,42 @@ export const ChainChaosABI = [
         "type": "uint256"
       }
     ],
+    "name": "getBetPlayerBets",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "player",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "guess",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "claimed",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct ChainChaos.PlayerBet[]",
+        "name": "",
+        "type": "tuple[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "betId",
+        "type": "uint256"
+      }
+    ],
     "name": "getBetPlayerGuesses",
     "outputs": [
       {
@@ -631,6 +788,25 @@ export const ChainChaosABI = [
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "betId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getBetSampledBlocks",
+    "outputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "",
+        "type": "uint256[]"
       }
     ],
     "stateMutability": "view",
@@ -733,7 +909,7 @@ export const ChainChaosABI = [
     "outputs": [
       {
         "internalType": "bool",
-        "name": "isActive",
+        "name": "",
         "type": "bool"
       }
     ],
@@ -787,6 +963,39 @@ export const ChainChaosABI = [
   {
     "inputs": [],
     "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "betId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "actualValue",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "endBlockHeight",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "sampledBlocks",
+        "type": "uint256[]"
+      },
+      {
+        "internalType": "string",
+        "name": "calculationDetails",
+        "type": "string"
+      }
+    ],
+    "name": "settleAutomatedBet",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

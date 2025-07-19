@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: chain-chaos-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  chain-chaos-automation:
+    build: .
+    container_name: chain-chaos-automation
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      # Network Configuration
+      - IS_TESTNET=${IS_TESTNET:-false}
+      
+      # Mainnet Configuration
+      - ETHERLINK_RPC_URL=${ETHERLINK_RPC_URL:-https://node.mainnet.etherlink.com}
+      - CHAIN_CHAOS_CONTRACT_ADDRESS=${CHAIN_CHAOS_CONTRACT_ADDRESS}
+      
+      # Testnet Configuration  
+      - ETHERLINK_TESTNET_RPC_URL=${ETHERLINK_TESTNET_RPC_URL:-https://node.ghostnet.etherlink.com}
+      - CHAIN_CHAOS_TESTNET_CONTRACT_ADDRESS=${CHAIN_CHAOS_TESTNET_CONTRACT_ADDRESS}
+      
+      # Common Configuration
+      - AUTOMATION_PRIVATE_KEY=${AUTOMATION_PRIVATE_KEY}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - DEBUG=${DEBUG:-false}
+    volumes:
+      - ./logs:/app/logs:rw
+    labels:
+      - "com.docker.compose.project=chain-chaos"
+      - "com.docker.compose.service=automation"
+    healthcheck:
+      test: ["CMD", "node", "-e", "console.log('Service is running')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  redis_data:
+    driver: local
+
+# Optional: Add a monitoring service
+  # watchtower:
+  #   image: containrrr/watchtower
+  #   container_name: watchtower
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   command: --interval 300 chain-chaos-automation
+  #   restart: unless-stopped 

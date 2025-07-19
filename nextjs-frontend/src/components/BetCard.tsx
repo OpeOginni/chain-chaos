@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState } from 'react'
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi'
+import { useWalletConnection } from '@/hooks/useWalletConnection'
 import { parseEther, parseUnits } from 'viem'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -22,6 +23,7 @@ import {
 import { formatEther, formatUSDC, formatBetCategory, formatTimestamp, formatCountdown } from '@/lib/utils'
 import { fetchBaselineData, formatBetCategoryName, getPredictionHint } from '@/lib/baseline-data'
 import { TokenIcon, getTokenSymbol } from '@/components/ui/TokenIcon'
+import { AutomationDetails } from '@/components/AutomationDetails'
 import { Clock, Users, DollarSign, TrendingUp, Loader2, CheckCircle, Trophy, Gift, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -31,7 +33,8 @@ interface BetCardProps {
 }
 
 export function BetCard({ bet, chainId }: BetCardProps) {
-  const { address, isConnected } = useAccount()
+  const { address } = useAccount()
+  const { isConnected, isHydrated } = useWalletConnection()
   const guessRef = useRef<HTMLInputElement>(null)
   const [baselineData, setBaselineData] = useState<{
     value: string
@@ -88,14 +91,14 @@ export function BetCard({ bet, chainId }: BetCardProps) {
     },
   })
 
-  // Check if user participated in this bet
+  // Check if user participated in this bet (for both settled and cancelled bets)
   const { data: userParticipated } = useReadContract({
     address: chainChaosAddress,
     abi: ChainChaosABI,
     functionName: 'hasPlayerBet',
     args: [bet.id, address as `0x${string}` || '0x0000000000000000000000000000000000000000'],
     query: {
-      enabled: !!(bet.status === BetStatus.SETTLED && address && chainChaosAddress),
+      enabled: !!((bet.status === BetStatus.SETTLED || bet.status === BetStatus.CANCELLED) && address && chainChaosAddress && isHydrated),
     },
   })
 
@@ -175,6 +178,15 @@ export function BetCard({ bet, chainId }: BetCardProps) {
         toast.success('Prize claimed successfully!', {
           description: 'Your winnings have been transferred to your wallet.'
         })
+        
+        // Remove winner notification from Redis
+        if (address) {
+          fetch(`/api/notifications?address=${address}&betId=${bet.id}`, {
+            method: 'DELETE'
+          }).catch(error => {
+            console.error('Failed to remove notification:', error)
+          })
+        }
       } else if (transactionType === 'approve') {
         toast.success('USDC spending approved!', {
           description: 'You can now place your bet.'
@@ -194,7 +206,7 @@ export function BetCard({ bet, chainId }: BetCardProps) {
       lastTransactionRef.current.type = null
       reset() // Reset the transaction state
     }
-  }, [isSuccess, hash, refetchAllowance, reset])
+  }, [isSuccess, hash, refetchAllowance, reset, address, bet.id])
 
   const isLoading = isPending || isConfirming
 
@@ -241,7 +253,20 @@ export function BetCard({ bet, chainId }: BetCardProps) {
       return
     }
 
-    const guessValue = BigInt(Math.floor(parseFloat(guess)))
+    let guessValue: bigint;
+    const guessFloat = parseFloat(guess);
+
+    // For categories that are measured in wei, convert from ether
+    if (['base_fee_per_gas', 'burnt_fees', 'gas_used'].includes(bet.category)) {
+      try {
+        guessValue = parseEther(guess);
+      } catch {
+        toast.error('Invalid number format for this category');
+        return;
+      }
+    } else {
+      guessValue = BigInt(Math.floor(guessFloat));
+    }
     
     try {
       lastTransactionRef.current.type = 'bet'
@@ -369,6 +394,13 @@ export function BetCard({ bet, chainId }: BetCardProps) {
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {/* Automation Details */}
+        <AutomationDetails 
+          betId={bet.id} 
+          chainId={chainId} 
+          isSettled={bet.status === BetStatus.SETTLED} 
+        />
+
         {/* Bet Details */}
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div className="bet-stat">
@@ -536,7 +568,7 @@ export function BetCard({ bet, chainId }: BetCardProps) {
         )}
 
         {/* Status Messages */}
-        {bet.status === BetStatus.ACTIVE && !isConnected && (
+        {bet.status === BetStatus.ACTIVE && !isConnected && isHydrated && (
           <div className="text-center py-2">
             <p className="text-sm text-muted-foreground">Connect wallet to place bet</p>
           </div>
@@ -550,48 +582,60 @@ export function BetCard({ bet, chainId }: BetCardProps) {
           </div>
         )}
 
-        {bet.status === BetStatus.CANCELLED && bet.refundMode && (
-          <div className="text-center py-2">
+        {bet.status === BetStatus.CANCELLED && bet.refundMode && !isConnected && isHydrated && (
+          <div className="text-center py-2 space-y-2">
             <Badge variant="outline" className="text-yellow-500 border-yellow-500">
               Refunds Available
             </Badge>
+            <p className="text-xs text-muted-foreground">Connect wallet to claim refund</p>
           </div>
         )}
 
-        {/* Claiming Interface for Settled Bets */}
-        {bet.status === BetStatus.SETTLED && isConnected && userParticipated && (
+        {bet.status === BetStatus.CANCELLED && bet.refundMode && isConnected && userParticipated && (
           <>
             <Separator />
             <div className="space-y-3">
-              {bet.refundMode ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-amber-500">
-                    <AlertCircle className="h-4 w-4" />
-                    <span className="text-sm font-medium">Refund Available</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    This bet was cancelled or had insufficient participants. You can claim your refund.
-                  </p>
-                  <Button 
-                    onClick={handleClaimPrize}
-                    disabled={isLoading || isClaiming}
-                    className="w-full"
-                    variant="outline"
-                  >
-                    {isLoading || isClaiming ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        {isConfirming ? 'Confirming...' : 'Claiming...'}
-                      </>
-                    ) : (
-                      <>
-                        <Gift className="h-4 w-4 mr-2" />
-                        Claim Refund ({formatAmount(bet.betAmount, bet.currencyType)} {getTokenSymbol(bet.currencyType)})
-                      </>
-                    )}
-                  </Button>
-                </div>
-              ) : winnerIndices && winnerIndices.length > 0 ? (
+              <div className="flex items-center gap-2 text-amber-500">
+                <AlertCircle className="h-4 w-4" />
+                <span className="text-sm font-medium">Refund Available</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This bet was cancelled or had insufficient participants. You can claim your refund.
+              </p>
+              <Button 
+                onClick={handleClaimPrize}
+                disabled={isLoading || isClaiming}
+                className="w-full"
+                variant="outline"
+              >
+                {isLoading || isClaiming ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {isConfirming ? 'Confirming...' : 'Claiming...'}
+                  </>
+                ) : (
+                  <>
+                    <Gift className="h-4 w-4 mr-2" />
+                    Claim Refund ({formatAmount(bet.betAmount, bet.currencyType)} {getTokenSymbol(bet.currencyType)})
+                  </>
+                )}
+              </Button>
+            </div>
+          </>
+        )}
+
+        {/* Claiming Interface for Settled Bets */}
+        {bet.status === BetStatus.SETTLED && !isConnected && isHydrated && (
+          <div className="text-center py-2 space-y-2">
+            <p className="text-sm text-muted-foreground">Connect wallet to check for winnings</p>
+          </div>
+        )}
+
+        {bet.status === BetStatus.SETTLED && isConnected && userParticipated && !bet.refundMode && (
+          <>
+            <Separator />
+            <div className="space-y-3">
+              { winnerIndices && winnerIndices.length > 0 ? (
                 <div className="space-y-3">
                   <div className="text-xs text-muted-foreground space-y-1">
                     <p>Actual result: <span className="font-semibold text-blue-400">{bet.actualValue.toString()}</span></p>
