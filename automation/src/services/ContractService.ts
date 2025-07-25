@@ -198,6 +198,24 @@ export class ContractService {
     }
   }
 
+  async cancelBet(betId: bigint): Promise<string> {
+    await this.initializeContract();
+    
+    if (!this.contract) {
+      throw new Error('Contract not initialized');
+    }
+
+    try {
+      const tx = await this.contract.cancelBet(betId);
+      const receipt = await tx.wait();
+      this.logger.info(`🚫 Cancelled bet ${betId} - TX: ${receipt.hash}`);
+      return receipt.hash;
+    } catch (error) {
+      this.logger.error(`Error cancelling bet ${betId}:`, error);
+      throw error;
+    }
+  }
+
   async getBetWinnerIndices(betId: bigint): Promise<bigint[]> {
     await this.initializeContract();
     

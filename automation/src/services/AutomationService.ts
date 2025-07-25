@@ -123,31 +123,47 @@ export class AutomationService {
         if (isAutomated && isExpired) {
           this.logger.info(`⏰ Settling expired bet ${betId}...`);
           
-          const startBlockHeight = Number(automationData[0]);
-          const category = betInfo[1];
-          
-          // Calculate how many blocks should have passed (roughly 1 block per 15 seconds)
-          const expectedBlocks = Math.floor(5 * 60 / 15); // 5 minutes / 15 seconds per block
-          const endBlockHeight = Math.min(startBlockHeight + expectedBlocks, currentBlockHeight);
-          
-          const result = await this.calculateResult(category, startBlockHeight, endBlockHeight);
-          
-          this.logger.info(`📈 Calculated result for ${category}: ${result.value}`);
-          this.logger.debug(`🔍 Details: ${result.details}`);
-          
-          // Settle the bet
-          const txHash = await this.contractService.settleAutomatedBet(
-            betId,
-            result.value,
-            endBlockHeight,
-            result.sampledBlocks,
-            result.details
-          );
-          
-          this.logger.info(`✅ Bet ${betId} settled successfully`);
+          try {
+            const startBlockHeight = Number(automationData[0]);
+            const category = betInfo[1];
+            
+            // Calculate how many blocks should have passed (roughly 1 block per 15 seconds)
+            const expectedBlocks = Math.floor(5 * 60 / 15); // 5 minutes / 15 seconds per block
+            const endBlockHeight = Math.min(startBlockHeight + expectedBlocks, currentBlockHeight);
+            
+            const result = await this.calculateResult(category, startBlockHeight, endBlockHeight);
+            
+            this.logger.info(`📈 Calculated result for ${category}: ${result.value}`);
+            this.logger.debug(`🔍 Details: ${result.details}`);
+            
+            // Settle the bet
+            const txHash = await this.contractService.settleAutomatedBet(
+              betId,
+              result.value,
+              endBlockHeight,
+              result.sampledBlocks,
+              result.details
+            );
+            
+            this.logger.info(`✅ Bet ${betId} settled successfully`);
 
-          // Track winners in Redis for notifications
-          await this.trackWinners(betId, betInfo, txHash);
+            // Track winners in Redis for notifications
+            await this.trackWinners(betId, betInfo, txHash);
+          } catch (settlementError) {
+            this.logger.error(`❌ Failed to settle bet ${betId}, attempting to cancel:`, settlementError);
+            
+            try {
+              const cancelTxHash = await this.contractService.cancelBet(betId);
+              this.logger.info(`🚫 Bet ${betId} cancelled due to settlement failure - TX: ${cancelTxHash}`);
+              
+              // Optionally track the cancellation for notifications
+              await this.trackCancellation(betId, betInfo, cancelTxHash);
+            } catch (cancelError) {
+              this.logger.error(`❌ Failed to cancel bet ${betId} after settlement failure:`, cancelError);
+              // At this point, manual intervention may be required
+              throw new Error(`Critical: Could not settle or cancel bet ${betId}. Manual intervention required.`);
+            }
+          }
         }
       } catch (error) {
         this.logger.error(`❌ Error settling bet ${betId}:`, error);
@@ -195,6 +211,36 @@ export class AutomationService {
       this.logger.info(`🏆 Tracked ${winnerIndices.length} winners for bet ${betId}`);
     } catch (error) {
       this.logger.error(`❌ Error tracking winners for bet ${betId}:`, error);
+      // Don't throw - this is not critical for the main automation flow
+    }
+  }
+
+  private async trackCancellation(betId: bigint, betInfo: any, txHash: string): Promise<void> {
+    try {
+      // Get all player bets to notify participants about cancellation
+      const playerBets = await this.contractService.getPlayerBets(betId);
+      const totalPot = Number(betInfo[7]);
+      const currencyType = Number(betInfo[3]);
+      const betAmount = Number(betInfo[4]);
+
+      for (const playerBet of playerBets) {
+        const notification: WinnerNotification = {
+          betId: betId.toString(),
+          winnerAddress: playerBet[0], // player address
+          betCategory: betInfo[1], // category
+          betDescription: `CANCELLED: ${betInfo[2]}`, // mark as cancelled
+          prizeAmount: betAmount.toString(), // refund amount
+          currencyType: currencyType,
+          settledAt: new Date().toISOString(),
+          txHash: txHash
+        };
+
+        await this.redisService.addWinnerNotification(notification);
+      }
+
+      this.logger.info(`🚫 Tracked cancellation for ${playerBets.length} players in bet ${betId}`);
+    } catch (error) {
+      this.logger.error(`❌ Error tracking cancellation for bet ${betId}:`, error);
       // Don't throw - this is not critical for the main automation flow
     }
   }

@@ -75,6 +75,32 @@ export function BetHistory({ onBack }: BetHistoryProps) {
     },
   })
 
+  // More efficient: Get players for each bet and filter client-side
+  const UserBetItem = ({ betId }: { betId: bigint }) => {
+    const { data: betPlayers, isLoading: loadingPlayers } = useReadContract({
+      contract: contract!,
+      method: 'getBetPlayers',
+      params: [betId],
+      queryOptions: {
+        enabled: !!contract,
+        refetchInterval: 60 * 1000, // Cache for 1 minute
+      },
+    })
+    
+    // Check if user participated by looking for their address in players array
+    const userParticipated = useMemo(() => {
+      if (!betPlayers || !account?.address) return false
+      return betPlayers.some((player: string) => 
+        player.toLowerCase() === account.address!.toLowerCase()
+      )
+    }, [betPlayers, account?.address])
+    
+    // Don't render if user didn't participate
+    if (!userParticipated) return null
+    
+    return <BetItem betId={betId} />
+  }
+
   // Helper component to fetch and display individual bet data
   const BetItem = ({ betId }: { betId: bigint }) => {
     const { data: betData, isLoading } = useReadContract({
@@ -271,11 +297,6 @@ export function BetHistory({ onBack }: BetHistoryProps) {
             <TabsTrigger value="rewards" className="flex items-center gap-2">
               <Trophy className="h-4 w-4" />
               My Rewards
-              {settledBetIds && settledBetIds.length > 0 && (
-                <Badge variant="secondary" className="ml-1">
-                  {settledBetIds.length}
-                </Badge>
-              )}
             </TabsTrigger>
           </TabsList>
 
@@ -304,9 +325,9 @@ export function BetHistory({ onBack }: BetHistoryProps) {
               <div className="text-center py-16 space-y-4">
                 <Trophy className="h-12 w-12 text-muted-foreground mx-auto" />
                 <div>
-                  <h3 className="text-lg font-semibold">No Unclaimed Rewards</h3>
+                  <h3 className="text-lg font-semibold">No Settled Rounds Yet</h3>
                   <p className="text-muted-foreground">
-                    All your rewards have been claimed, or you haven't participated in any settled rounds yet.
+                    Participate in prediction rounds to see your rewards here when they settle.
                   </p>
                 </div>
                 <Button onClick={handleBack}>
@@ -319,19 +340,18 @@ export function BetHistory({ onBack }: BetHistoryProps) {
                 <Alert className="border-blue-500/20 bg-blue-500/5">
                   <Trophy className="h-4 w-4 text-blue-500" />
                   <AlertDescription>
-                    Showing <strong>{Math.min(settledBetIds?.length || 0, 10)}</strong> recent settled rounds.
-                    Each bet card shows if you participated and have rewards to claim.
+                    Showing rounds you participated in. Each card shows your participation and any rewards to claim.
                   </AlertDescription>
                 </Alert>
                 
                 <div className="grid gap-6 max-w-4xl mx-auto">
-                  {/* Show recent settled bets where user might have rewards */}
+                  {/* Show recent settled bets where user participated */}
                   {settledBetIds
                     ?.slice()
                     .reverse() // Most recent first
-                    .slice(0, 10) // Show last 10 settled bets
+                    .slice(0, 20) // Show last 20 settled bets (filtered to user participation)
                     .map((betId: bigint) => (
-                      <BetItem key={`reward-${betId.toString()}`} betId={betId} />
+                      <UserBetItem key={`reward-${betId.toString()}`} betId={betId} />
                     ))}
                 </div>
               </div>

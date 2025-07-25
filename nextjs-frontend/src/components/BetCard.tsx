@@ -36,6 +36,14 @@ import { AutomationDetails } from '@/components/AutomationDetails'
 import { Clock, Users, DollarSign, TrendingUp, Loader2, CheckCircle, Trophy, Gift, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 
+// Helper function to check if a category is price-related (should show actual value)
+function isPriceCategory(category: string): boolean {
+  const priceCategories = ['xtz_price', 'usdc_price', 'token_price']
+  return priceCategories.some(priceCategory => 
+    category.toLowerCase().includes(priceCategory) || category.toLowerCase().includes('price')
+  )
+}
+
 interface BetCardProps {
   bet: BetInfo | Bet
   chainId?: number
@@ -170,6 +178,17 @@ export function BetCard({ bet, chainId: propChainId }: BetCardProps) {
     },
   })
 
+  // Get user's bet info including claimed status
+  const { data: playerBetData, refetch: refetchPlayerBetData } = useReadContract({
+    contract: chainChaosContract!,
+    method: "getPlayerBet",
+    params: betInfo && account && userParticipated ? [betInfo.id, account.address] : undefined!,
+    queryOptions: {
+      enabled: !!((betInfo?.status === BetStatus.SETTLED || betInfo?.status === BetStatus.CANCELLED) && account && chainChaosContract && userParticipated),
+      refetchInterval: 5 * 1000, // Refetch every 5 seconds to catch claim updates
+    },
+  })
+
   // Computed values
   const needsApproval = betInfo?.currencyType === CurrencyType.USDC && 
     allowance !== undefined && (allowance as unknown as bigint) < betInfo.betAmount
@@ -177,6 +196,10 @@ export function BetCard({ bet, chainId: propChainId }: BetCardProps) {
   const isClaiming = lastTransactionRef.current.type === 'claim'
   const isPlacingBet = lastTransactionRef.current.type === 'bet' || lastTransactionRef.current.type === 'approve'
   const isPending = !!transactionHash && !receipt
+  
+  // Extract claimed status from player bet data
+  const userGuess = playerBetData ? playerBetData[0] : undefined
+  const alreadyClaimed = playerBetData ? playerBetData[1] : false
 
   // Timer effect
   useEffect(() => {
@@ -560,7 +583,7 @@ export function BetCard({ bet, chainId: propChainId }: BetCardProps) {
             </div>
           )}
 
-                     {betInfo.status === BetStatus.SETTLED && (
+                     {betInfo.status === BetStatus.SETTLED && isPriceCategory(betInfo.category) && (
              <div className="bet-stat">
                <div className="text-muted-foreground">Actual Value</div>
                <div className="font-semibold text-blue-400">{formatActualValue(betInfo.actualValue)}</div>
@@ -703,31 +726,50 @@ export function BetCard({ bet, chainId: propChainId }: BetCardProps) {
           <>
             <Separator />
             <div className="space-y-3">
-              <div className="flex items-center gap-2 text-amber-500">
-                <AlertCircle className="h-4 w-4" />
-                <span className="text-sm font-medium">Refund Available</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                This bet was cancelled or had insufficient participants. You can claim your refund.
-              </p>
-              <Button 
-                onClick={handleClaimPrize}
-                disabled={loading || isClaiming}
-                className="w-full"
-                variant="outline"
-              >
-                {loading || isClaiming ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    {isConfirming ? 'Confirming...' : 'Claiming...'}
-                  </>
-                ) : (
-                  <>
-                    <Gift className="h-4 w-4 mr-2" />
-                    Claim Refund ({formatAmount(betInfo.betAmount, betInfo.currencyType)} {getTokenSymbol(betInfo.currencyType)})
-                  </>
-                )}
-              </Button>
+              {alreadyClaimed ? (
+                <>
+                  <div className="flex items-center gap-2 text-green-500">
+                    <CheckCircle className="h-4 w-4" />
+                    <span className="text-sm font-medium">Refund Claimed</span>
+                  </div>
+                  <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-center space-y-1">
+                    <p className="text-sm text-green-700 dark:text-green-400">
+                      You already claimed your refund of {formatAmount(betInfo.betAmount, betInfo.currencyType)} {getTokenSymbol(betInfo.currencyType)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Your guess: {userGuess ? formatActualValue(userGuess as bigint) : 'N/A'}
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 text-amber-500">
+                    <AlertCircle className="h-4 w-4" />
+                    <span className="text-sm font-medium">Refund Available</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    This bet was cancelled or had insufficient participants. You can claim your refund.
+                  </p>
+                  <Button 
+                    onClick={handleClaimPrize}
+                    disabled={loading || isClaiming}
+                    className="w-full"
+                    variant="outline"
+                  >
+                    {loading || isClaiming ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        {isConfirming ? 'Confirming...' : 'Claiming...'}
+                      </>
+                    ) : (
+                      <>
+                        <Gift className="h-4 w-4 mr-2" />
+                        Claim Refund ({formatAmount(betInfo.betAmount, betInfo.currencyType)} {getTokenSymbol(betInfo.currencyType)})
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
             </div>
           </>
         )}
@@ -745,56 +787,72 @@ export function BetCard({ bet, chainId: propChainId }: BetCardProps) {
             <div className="space-y-3">
               { winnerIndices && (winnerIndices as bigint[]).length > 0 ? (
                 <div className="space-y-3">
-                                     <div className="text-xs text-muted-foreground space-y-1">
-                     <p>Actual result: <span className="font-semibold text-blue-400">{formatActualValue(betInfo.actualValue)}</span></p>
-                     <p>{(winnerIndices as bigint[]).length} winner{(winnerIndices as bigint[]).length > 1 ? 's' : ''} found</p>
-                   </div>
-                  
-                  <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-center space-y-2">
-                    <Trophy className="h-6 w-6 mx-auto text-blue-500" />
-                    <p className="text-sm font-medium">Round Complete</p>
-                                         <p className="text-xs text-muted-foreground">
-                       If your guess was closest to {formatActualValue(betInfo.actualValue)}, you can claim your prize
-                     </p>
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p>Actual result: <span className="font-semibold text-blue-400">{formatActualValue(betInfo.actualValue)}</span></p>
+                    <p>Your guess: <span className="font-semibold">{userGuess ? formatActualValue(userGuess as bigint) : 'N/A'}</span></p>
+                    <p>{(winnerIndices as bigint[]).length} winner{(winnerIndices as bigint[]).length > 1 ? 's' : ''} found</p>
                   </div>
                   
-                  <Button 
-                    onClick={handleClaimPrize}
-                    disabled={loading || isClaiming}
-                    className="w-full"
-                    variant="outline"
-                  >
-                    {loading || isClaiming ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        {isConfirming ? 'Confirming...' : 'Claiming...'}
-                      </>
-                    ) : (
-                      <>
-                        <Trophy className="h-4 w-4 mr-2" />
-                        Try to Claim Prize
-                      </>
-                    )}
-                  </Button>
-                  
-                  <p className="text-xs text-muted-foreground text-center">
-                    ⚠️ Only winners can successfully claim. Transaction will revert if you didn't win.
-                  </p>
+                  {alreadyClaimed ? (
+                    <>
+                      <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-center space-y-2">
+                        <CheckCircle className="h-6 w-6 mx-auto text-green-500" />
+                        <p className="text-sm font-medium text-green-700 dark:text-green-400">Prize Claimed!</p>
+                        <p className="text-xs text-muted-foreground">
+                          You successfully claimed your winnings from this round
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-center space-y-2">
+                        <Trophy className="h-6 w-6 mx-auto text-blue-500" />
+                        <p className="text-sm font-medium">Round Complete</p>
+                        <p className="text-xs text-muted-foreground">
+                          If your guess was closest to {formatActualValue(betInfo.actualValue)}, you can claim your prize
+                        </p>
+                      </div>
+                      
+                      <Button 
+                        onClick={handleClaimPrize}
+                        disabled={loading || isClaiming}
+                        className="w-full"
+                        variant="outline"
+                      >
+                        {loading || isClaiming ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            {isConfirming ? 'Confirming...' : 'Claiming...'}
+                          </>
+                        ) : (
+                          <>
+                            <Trophy className="h-4 w-4 mr-2" />
+                            Try to Claim Prize
+                          </>
+                        )}
+                      </Button>
+                      
+                      <p className="text-xs text-muted-foreground text-center">
+                        ⚠️ Only winners can successfully claim. Transaction will revert if you didn't win.
+                      </p>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
-                   <div className="text-xs text-muted-foreground space-y-1">
-                     <p>Actual result: <span className="font-semibold text-blue-400">{formatActualValue(betInfo.actualValue)}</span></p>
-                     <p>No winners found</p>
-                   </div>
-                   
-                   <div className="text-center py-3">
-                     <Badge variant="outline" className="text-muted-foreground">
-                       No winners in this round
-                     </Badge>
-                   </div>
-                 </div>
-               )}
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p>Actual result: <span className="font-semibold text-blue-400">{formatActualValue(betInfo.actualValue)}</span></p>
+                    <p>Your guess: <span className="font-semibold">{userGuess ? formatActualValue(userGuess as bigint) : 'N/A'}</span></p>
+                    <p>No winners found</p>
+                  </div>
+                  
+                  <div className="text-center py-3">
+                    <Badge variant="outline" className="text-muted-foreground">
+                      No winners in this round
+                    </Badge>
+                  </div>
+                </div>
+              )}
             </div>
           </>
         )}
