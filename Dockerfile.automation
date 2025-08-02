@@ -10,8 +10,8 @@ COPY ./automation/package.json ./
 # Install dependencies
 RUN npm install
 
-# Copy source code
-COPY . .
+# Copy automation code code
+COPY ./automation .
 
 RUN npm run build
 
