@@ -1,12 +1,11 @@
 'use client'
 
 import { useReadContract } from 'thirdweb/react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { ChainChaosABI } from '@/blockchain/ChainChaosABI'
 import { getChainChaosAddress, getChainChaosContract } from '@/lib/thirdweb'
-import { ChevronDown, ChevronRight, Bot, Calculator, Hash, Clock } from 'lucide-react'
+import { ChevronDown, ChevronRight, Bot, Calculator, Hash } from 'lucide-react'
 import { useState } from 'react'
 
 interface AutomationDetailsProps {

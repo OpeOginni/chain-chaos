@@ -1,15 +1,14 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useMemo } from 'react'
 import { useActiveAccount, useActiveWalletChain } from 'thirdweb/react'
 import { useReadContract } from "thirdweb/react"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { BetCard } from '@/components/BetCard'
+import { BetCard } from '@/components/bet-cards/BetCard'
 import { 
   BetInfo, 
   BetStatus,
@@ -33,10 +32,7 @@ export function BetHistory({ onBack }: BetHistoryProps) {
   const account = useActiveAccount()
   const activeChain = useActiveWalletChain()
   const chainId = activeChain?.id || defaultChain.id
-  const [expandedBets, setExpandedBets] = useState<Set<string>>(new Set())
-
   const isConnected = !!account
-  const chainChaosAddress = getChainChaosAddress(chainId)
   const addressesAvailable = areAddressesAvailable(chainId)
   const isEtherlink = isEtherlinkChain(chainId)
   const contract = getChainChaosContract(chainId)

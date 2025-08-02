@@ -84,6 +84,7 @@ So we made ChainChaos — the game where the *chain itself is the game.*
 
 - **Etherlink Blockchain**
   - used in the `blockchain/hardhat.config.ts`, where the chains are added for deployment
+  - Etherlink makes the automation feature very easy due to its (nearly) free features, making gas fees for running such a continous system very cheap.
 
 - **ThirdWeb Wallet**
   - used in the `nextjs-frontned/src/lib/thirdweb.ts`, where we define the etherlink chains so users can connect their wallets to the app.

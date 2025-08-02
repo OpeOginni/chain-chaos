@@ -5,7 +5,7 @@ import { useActiveAccount, useActiveWalletChain, useReadContract } from 'thirdwe
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { BetCard } from '@/components/BetCard'
+import { BetCard } from '@/components/bet-cards/BetCard'
 import { 
   BetInfo, 
   BetStatus

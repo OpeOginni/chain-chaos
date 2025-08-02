@@ -1,14 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi'
+import { useSendTransaction } from 'thirdweb/react'
+import { prepareContractCall, waitForReceipt, getContract } from 'thirdweb'
 import { formatEther, formatUnits } from 'viem'
 import { formatActualValue, getCategoryUnit, isGasCategory } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import {
   Dialog,
@@ -20,13 +19,13 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { ChainChaosABI } from '@/blockchain/ChainChaosABI'
 import { 
   BetInfo, 
   BetStatus, 
   CurrencyType
 } from '@/lib/types'
 import {
+  getChainChaosContract,
   getChainChaosAddress,
   areAddressesAvailable 
 } from '@/lib/thirdweb'
@@ -49,92 +48,54 @@ interface AdminBetCardProps {
   bet: BetInfo
   isActive: boolean
   onBetUpdate: () => void
+  chainId: number
 }
 
-export function AdminBetCard({ bet, isActive, onBetUpdate }: AdminBetCardProps) {
-  const chainId = useChainId()
-  const [settleDialogOpen, setSettleDialogOpen] = useState(false)
+export function AdminBetCard({ bet, isActive, onBetUpdate, chainId }: AdminBetCardProps) {
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
-  const [actualValue, setActualValue] = useState('')
-  const [currentAction, setCurrentAction] = useState<'settle' | 'cancel' | null>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
 
   const chainChaosAddress = getChainChaosAddress(chainId)
   const addressesAvailable = areAddressesAvailable(chainId)
+  const contract = getChainChaosContract(chainId)
 
-  const { writeContract, data: hash, isPending, reset } = useWriteContract()
-
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash,
-  })
-
-  const isLoading = isPending || isConfirming
-
-  // Handle transaction success
-  useEffect(() => {
-    if (isSuccess && hash) {
-      const actionText = currentAction === 'settle' ? 'settled' : 'cancelled'
-      toast.success(`Bet ${actionText} successfully!`, {
-        description: `Bet #${bet.id.toString()} has been ${actionText}.`
-      })
-      
-      setSettleDialogOpen(false)
-      setCancelDialogOpen(false)
-      setActualValue('')
-      setCurrentAction(null)
-      onBetUpdate()
-      reset() // Reset the transaction state
-    }
-  }, [isSuccess, hash, currentAction, bet.id, onBetUpdate, reset])
-
-  const handleSettleBet = async () => {
-    if (!actualValue || parseFloat(actualValue) < 0) {
-      toast.error('Please enter a valid actual value')
-      return
-    }
-
-    if (!chainChaosAddress || !addressesAvailable) {
-      toast.error('Contract not available on this network')
-      return
-    }
-
-    try {
-      setCurrentAction('settle')
-      
-      // Use raw value for all categories (no conversion needed)
-      const value = BigInt(Math.floor(parseFloat(actualValue)))
-      
-      writeContract({
-        address: chainChaosAddress,
-        abi: ChainChaosABI,
-        functionName: 'settleBet',
-        args: [bet.id, value],
-      })
-    } catch (error) {
-      toast.error('Failed to settle bet')
-      console.error(error)
-      setCurrentAction(null)
-    }
-  }
+  const { mutate: sendTransaction } = useSendTransaction()
 
   const handleCancelBet = async () => {
-    if (!chainChaosAddress || !addressesAvailable) {
+    if (!contract || !addressesAvailable) {
       toast.error('Contract not available on this network')
       return
     }
 
     try {
-      setCurrentAction('cancel')
+      setIsProcessing(true)
       
-      writeContract({
-        address: chainChaosAddress,
-        abi: ChainChaosABI,
-        functionName: 'cancelBet',
-        args: [bet.id],
+      const transaction = prepareContractCall({
+        contract,
+        method: 'cancelBet',
+        params: [bet.id],
+      })
+      
+      sendTransaction(transaction as any, {
+        onSuccess: (result) => {
+          toast.success('Bet cancelled successfully!', {
+            description: `Bet #${bet.id.toString()} has been cancelled. Refunds are now available.`,
+            descriptionClassName: 'text-sm text-white/80'
+          })
+          setCancelDialogOpen(false)
+          onBetUpdate()
+          setIsProcessing(false)
+        },
+        onError: (error) => {
+          toast.error('Failed to cancel bet')
+          console.error(error)
+          setIsProcessing(false)
+        }
       })
     } catch (error) {
-      toast.error('Failed to cancel bet')
+      toast.error('Failed to prepare transaction')
       console.error(error)
-      setCurrentAction(null)
+      setIsProcessing(false)
     }
   }
 
@@ -280,93 +241,18 @@ export function AdminBetCard({ bet, isActive, onBetUpdate }: AdminBetCardProps) 
         </div>
 
         {/* Admin Actions */}
-        {isActive && bet.status === BetStatus.ACTIVE && (
+        {isActive && bet.status === BetStatus.ACTIVE && bet.endTime < Date.now() && (
           <>
             <Separator />
             <div className="flex gap-2">
-              {/* Settle Bet Dialog */}
-              <Dialog open={settleDialogOpen} onOpenChange={setSettleDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button 
-                    variant="default" 
-                    size="sm" 
-                    className="flex-1"
-                    disabled={isLoading}
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Settle Bet
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Settle Bet #{bet.id.toString()}</DialogTitle>
-                    <DialogDescription>
-                      Enter the actual value to settle this bet and distribute prizes to winners.
-                    </DialogDescription>
-                  </DialogHeader>
-                  
-                  <div className="space-y-4">
-                    <div className="p-4 bg-muted/50 rounded-lg">
-                      <h4 className="font-medium mb-2">Bet Details</h4>
-                      <p className="text-sm text-muted-foreground">{bet.description}</p>
-                      <div className="flex items-center gap-2 mt-2 text-xs">
-                        <TokenIcon currencyType={bet.currencyType} size={12} />
-                        <span>Total Pot: {formatAmount(bet.totalPot, bet.currencyType)} {getTokenSymbol(bet.currencyType)}</span>
-                        <span>• Players: {bet.playerBetCount.toString()}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="actualValue" className="text-sm font-medium">
-                        Actual Value
-                      </Label>
-                      <Input
-                        id="actualValue"
-                        type="number"
-                        step="1"
-                        placeholder="Enter actual value"
-                        value={actualValue}
-                        onChange={(e) => setActualValue(e.target.value)}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        This value will determine the winners and prize distribution.
-                      </p>
-                    </div>
-                  </div>
-
-                  <DialogFooter>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setSettleDialogOpen(false)}
-                      disabled={isLoading}
-                    >
-                      Cancel
-                    </Button>
-                    <Button 
-                      onClick={handleSettleBet}
-                      disabled={!actualValue || isLoading}
-                    >
-                      {isLoading && currentAction === 'settle' ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          {isConfirming ? 'Confirming...' : 'Settling...'}
-                        </>
-                      ) : (
-                        'Settle Bet'
-                      )}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-
               {/* Cancel Bet Dialog */}
               <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
                 <DialogTrigger asChild>
                   <Button 
                     variant="destructive" 
                     size="sm" 
-                    className="flex-1"
-                    disabled={isLoading}
+                    className="w-full"
+                    disabled={isProcessing}
                   >
                     <XCircle className="h-4 w-4 mr-2" />
                     Cancel Bet
@@ -401,19 +287,19 @@ export function AdminBetCard({ bet, isActive, onBetUpdate }: AdminBetCardProps) 
                     <Button 
                       variant="outline" 
                       onClick={() => setCancelDialogOpen(false)}
-                      disabled={isLoading}
+                      disabled={isProcessing}
                     >
                       Keep Bet Active
                     </Button>
                     <Button 
                       variant="destructive"
                       onClick={handleCancelBet}
-                      disabled={isLoading}
+                      disabled={isProcessing}
                     >
-                      {isLoading && currentAction === 'cancel' ? (
+                      {isProcessing ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          {isConfirming ? 'Confirming...' : 'Cancelling...'}
+                          Cancelling...
                         </>
                       ) : (
                         'Yes, Cancel Bet'
