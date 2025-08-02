@@ -494,6 +494,10 @@ export class AutomationService {
         }
       }
     }
+
+    if(category === 'burnt_fees'){
+      value = Number(ethers.formatEther(value.toString()));
+    }
     
     return { value, sampledBlocks: sampledBlockHeights, details };
   }

@@ -450,6 +450,16 @@ export function BetCard({ bet, chainId: propChainId }: BetCardProps) {
       : formatUSDC(amount)
   }
 
+  const checkIfFormatEtherIsNeeded = (value: string, unit: string): {value: string, unit: string} => {
+    if (unit === 'wei') {
+      const formattedValue = formatEther(BigInt(value))
+      const returnedValue = Number(formattedValue) === 0 ? value : formattedValue
+      const returnedUnit = returnedValue === value ? 'wei' : 'XTZ'
+      return {value: returnedValue, unit: returnedUnit}
+    }
+    return {value: value, unit: unit}
+  }
+
   if (isLoading && !betInfo) {
     return (
       <Card className="bet-card animate-pulse">
@@ -596,7 +606,7 @@ export function BetCard({ bet, chainId: propChainId }: BetCardProps) {
             <Separator />
             <div className="space-y-4">
               {/* Baseline Information */}
-              {baselineData && (
+              {baselineData && baselineData.value !== '0' && (
                 <div className="bg-muted/50 rounded-lg p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-muted-foreground">
@@ -606,8 +616,8 @@ export function BetCard({ bet, chainId: propChainId }: BetCardProps) {
                       Baseline
                     </Badge>
                   </div>
-                  <div className="text-lg font-bold text-primary">
-                    {baselineData.value} {baselineData.unit}
+                  <div className="text-lg font-bold text-primary flex items-center gap-1">
+                    {checkIfFormatEtherIsNeeded(baselineData.value, baselineData.unit).value} {checkIfFormatEtherIsNeeded(baselineData.value, baselineData.unit).unit}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {getPredictionHint(betInfo.category)}
@@ -627,7 +637,7 @@ export function BetCard({ bet, chainId: propChainId }: BetCardProps) {
                   Your Prediction
                   {baselineData && (
                     <span className="text-muted-foreground font-normal ml-1">
-                      (Current: {baselineData.value} {baselineData.unit})
+                      (Current: {checkIfFormatEtherIsNeeded(baselineData.value, baselineData.unit).value} {checkIfFormatEtherIsNeeded(baselineData.value, baselineData.unit).unit})
                     </span>
                   )}
                 </Label>
@@ -636,14 +646,14 @@ export function BetCard({ bet, chainId: propChainId }: BetCardProps) {
                   id="guess"
                   type="number"
                   step={isGasCategory(betInfo.category) ? "1" : "1"}
-                  placeholder={`Enter your prediction${baselineData ? ` (${baselineData.unit})` : ''}...`}
+                  placeholder={`Enter your prediction${baselineData ? ` (${checkIfFormatEtherIsNeeded(baselineData.value, baselineData.unit).unit})` : ''}...`}
                   className="w-full"
                 />
-                {isGasCategory(betInfo.category) && (
+                {/* {isGasCategory(betInfo.category) && (
                   <p className="text-xs text-muted-foreground">
-                    💡 Gas values are in wei. Large numbers are expected (e.g., 1000000000 for 1 Gwei).
+                    💡 Gas values are in wei. Large numbers are expected (e.g., 10,000,000,000 wei for 1 Gwei).
                   </p>
-                )}
+                )} */}
               </div>
               
               {/* USDC Approval Flow */}
