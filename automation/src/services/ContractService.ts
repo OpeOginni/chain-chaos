@@ -169,7 +169,7 @@ export class ContractService {
 
   async settleAutomatedBet(
     betId: bigint,
-    actualValue: number,
+    actualValue: bigint,
     endBlockHeight: number,
     sampledBlocks: number[],
     calculationDetails: string

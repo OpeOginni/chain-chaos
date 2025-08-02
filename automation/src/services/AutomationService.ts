@@ -12,7 +12,7 @@ export interface BetCategory {
 }
 
 export interface CalculationResult {
-  value: number;
+  value: bigint;
   sampledBlocks: number[];
   details: string;
 }
@@ -139,7 +139,7 @@ export class AutomationService {
             // Settle the bet
             const txHash = await this.contractService.settleAutomatedBet(
               betId,
-              result.value,
+              BigInt(result.value),
               endBlockHeight,
               result.sampledBlocks,
               result.details
@@ -442,10 +442,10 @@ export class AutomationService {
     }
 
     if (blockCount === 0) {
-      return { value: 0, sampledBlocks: [], details: "No blocks found in range to calculate average base fee." };
+      return { value: BigInt(0), sampledBlocks: [], details: "No blocks found in range to calculate average base fee." };
     }
 
-    const averageBaseFee = Math.round(totalBaseFee / blockCount);
+    const averageBaseFee = BigInt(Math.round(totalBaseFee / blockCount));
     const details = `Calculated average base fee from ${blockCount} blocks between ${startBlock} and ${endBlock}.`;
     
     return { value: averageBaseFee, sampledBlocks: [], details };
@@ -457,7 +457,7 @@ export class AutomationService {
     const allBlocks = Array.from({ length: totalBlocks }, (_, i) => startBlock + i);
     const sampledBlockHeights = this.shuffleArray(allBlocks).slice(0, sampleSize);
     
-    let value = 0;
+    let value = BigInt(0);
     const details = `Summed ${category} from ${sampledBlockHeights.length} randomly sampled blocks: [${sampledBlockHeights.slice(0, 5).join(', ')}${sampledBlockHeights.length > 5 ? '...' : ''}]`;
     
     try {
@@ -474,7 +474,7 @@ export class AutomationService {
             block = await this.blockchainService.getBlock(height);
           }
           
-          const fieldValue = parseInt(block[category] || '0');
+          const fieldValue = BigInt(block[category] || '0');
           value += fieldValue;
         } catch (error) {
           this.logger.warn(`Error fetching block ${height}:`, error);
@@ -487,7 +487,7 @@ export class AutomationService {
       for (const height of sampledBlockHeights) {
         try {
           const block = await this.blockchainService.getBlock(height);
-          const fieldValue = parseInt(block[category] || '0');
+          const fieldValue = BigInt(block[category] || '0');
           value += fieldValue;
         } catch (error) {
           this.logger.warn(`Error fetching block ${height}:`, error);
@@ -496,7 +496,7 @@ export class AutomationService {
     }
 
     if(category === 'burnt_fees'){
-      value = Number(ethers.formatEther(value.toString()));
+      value = value;
     }
     
     return { value, sampledBlocks: sampledBlockHeights, details };
@@ -507,7 +507,7 @@ export class AutomationService {
     const value = Math.floor(priceUSD * 100); // Convert to cents
     const details = `XTZ price fetched from CoinGecko API at settlement time: $${priceUSD.toFixed(2)} (${value} cents)`;
     
-    return { value, sampledBlocks: [], details };
+    return { value: BigInt(value), sampledBlocks: [], details };
   }
 
   // Utility functions
