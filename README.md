@@ -112,7 +112,8 @@ But it all starts here — at this hackathon.
 
 ⚡ Deploying on Etherlink Testnet  
 🌐 [Link to demo site]  
-📝 Contract address: *to be announced*
+📝 Contract address: [Contract](https://testnet.explorer.etherlink.com/address/0x1c9F0730dc774239247047ed6705a4363eC0651D)
+📹 [Youtube](https://youtu.be/6p3hzMpnAxk)
 
 ---
 
