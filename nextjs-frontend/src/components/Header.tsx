@@ -1,6 +1,6 @@
 "use client"
 
-import { ConnectButton, useActiveAccount, useActiveWalletChain, useSwitchActiveWalletChain } from 'thirdweb/react'
+import { ConnectButton, useActiveAccount, useActiveWalletChain } from 'thirdweb/react'
 import Link from 'next/link'
 import { Button } from './ui/button'
 import { HistoryIcon, Settings } from 'lucide-react'
@@ -12,7 +12,6 @@ import { client } from '@/lib/client'
 export default function Header() {
     const account = useActiveAccount()
     const activeChain = useActiveWalletChain()
-    const switchChain = useSwitchActiveWalletChain()
     const chainId = activeChain?.id || defaultChain.id
 
     const contract = getChainChaosContract(chainId)

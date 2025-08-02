@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useSendTransaction } from 'thirdweb/react'
-import { prepareContractCall, waitForReceipt, getContract } from 'thirdweb'
+import { prepareContractCall } from 'thirdweb'
 import { formatEther, formatUnits } from 'viem'
-import { formatActualValue, getCategoryUnit, isGasCategory } from '@/lib/utils'
+import { formatActualValue } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -38,7 +38,6 @@ import {
   Target, 
   XCircle, 
   CheckCircle, 
-  Clock,
   Loader2,
   AlertTriangle
 } from 'lucide-react'
@@ -77,7 +76,7 @@ export function AdminBetCard({ bet, isActive, onBetUpdate, chainId }: AdminBetCa
       })
       
       sendTransaction(transaction as any, {
-        onSuccess: (result) => {
+        onSuccess: () => {
           toast.success('Bet cancelled successfully!', {
             description: `Bet #${bet.id.toString()} has been cancelled. Refunds are now available.`,
             descriptionClassName: 'text-sm text-white/80'
@@ -109,19 +108,6 @@ export function AdminBetCard({ bet, isActive, onBetUpdate, chainId }: AdminBetCa
         return 'bg-red-500/20 text-red-400'
       default:
         return 'bg-gray-500/20 text-gray-400'
-    }
-  }
-
-  const getStatusIcon = (status: BetStatus) => {
-    switch (status) {
-      case BetStatus.ACTIVE:
-        return <Clock className="h-3 w-3" />
-      case BetStatus.SETTLED:
-        return <CheckCircle className="h-3 w-3" />
-      case BetStatus.CANCELLED:
-        return <XCircle className="h-3 w-3" />
-      default:
-        return <Clock className="h-3 w-3" />
     }
   }
 

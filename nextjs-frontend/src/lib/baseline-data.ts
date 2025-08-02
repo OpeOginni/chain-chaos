@@ -89,8 +89,6 @@ export const fetchBaselineData = async (category: string, chainId: number): Prom
       }
 
       case 'block_count': {
-        const currentBlockHex = await makeRpcCall(chainId, 'eth_blockNumber')
-        const currentBlock = hexToDecimal(currentBlockHex)
         const avgBlockTime = 15 // seconds (estimated for Etherlink)
         const expectedBlocks = Math.floor((10 * 60) / avgBlockTime) // 10 minutes
         return {

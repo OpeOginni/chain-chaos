@@ -1,7 +1,6 @@
 import { defineChain } from "thirdweb/chains";
 import { getContract } from "thirdweb";
 import { client } from "./client";
-import { ethereum } from "thirdweb/chains";
 import { ChainChaosABI } from "@/blockchain/ChainChaosABI";
 
 // Etherlink Mainnet

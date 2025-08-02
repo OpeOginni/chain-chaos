@@ -10,19 +10,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { BetCard } from '@/components/bet-cards/BetCard'
 import { 
-  BetInfo, 
-  BetStatus,
-  CurrencyType
+  BetInfo
 } from '@/lib/types'
 import { 
   getChainChaosContract,
-  getChainChaosAddress,
   areAddressesAvailable,
   isEtherlinkChain,
   getEtherlinkChainName,
   defaultChain
 } from '@/lib/thirdweb'
-import { ArrowLeft, Trophy, Clock, AlertTriangle, Gift } from 'lucide-react'
+import { ArrowLeft, Trophy, Clock, AlertTriangle } from 'lucide-react'
 
 interface BetHistoryProps {
   onBack?: () => void
@@ -73,7 +70,7 @@ export function BetHistory({ onBack }: BetHistoryProps) {
 
   // More efficient: Get players for each bet and filter client-side
   const UserBetItem = ({ betId }: { betId: bigint }) => {
-    const { data: betPlayers, isLoading: loadingPlayers } = useReadContract({
+    const { data: betPlayers } = useReadContract({
       contract: contract!,
       method: 'getBetPlayers',
       params: [betId],
@@ -89,7 +86,7 @@ export function BetHistory({ onBack }: BetHistoryProps) {
       return betPlayers.some((player: string) => 
         player.toLowerCase() === account.address!.toLowerCase()
       )
-    }, [betPlayers, account?.address])
+    }, [betPlayers])
     
     // Don't render if user didn't participate
     if (!userParticipated) return null

@@ -2,9 +2,9 @@
 
 import React from 'react'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent} from '@/components/ui/card'
 import { CurrencyType } from '@/lib/types'
-import { TokenIcon, getTokenSymbol } from '@/components/ui/TokenIcon'
+import { TokenIcon } from '@/components/ui/TokenIcon'
 
 export function SupportedTokens() {
   const tokens = [

@@ -10,10 +10,9 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { EtherlinkLogo } from '@/components/ui/EtherlinkLogo'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { 
   getChainChaosContract,
-  getChainChaosAddress,
   areAddressesAvailable,
   isEtherlinkChain,
   getEtherlinkChainName,
@@ -22,14 +21,13 @@ import {
 } from '@/lib/thirdweb'
 import { client } from '@/lib/client'
 import { BetInfo } from '@/lib/types'
-import { Settings, TrendingUp, Clock, Shield, DollarSign, AlertTriangle, Home, Gamepad2 } from 'lucide-react'
+import { TrendingUp, Clock, Shield, DollarSign, AlertTriangle, Home } from 'lucide-react'
 
 export function AdminPageClient() {
   const account = useActiveAccount()
   const activeChain = useActiveWalletChain()
   const chainId = activeChain?.id || defaultChain.id
 
-  const chainChaosAddress = getChainChaosAddress(chainId)
   const addressesAvailable = areAddressesAvailable(chainId)
   const isEtherlink = isEtherlinkChain(chainId)
   const contract = getChainChaosContract(chainId)
@@ -354,7 +352,7 @@ export function AdminPageClient() {
                   <div>
                     <h3 className="font-semibold">Access Denied</h3>
                     <p className="text-sm text-muted-foreground mt-1">
-                      You don't have permission to access the admin panel. Only the contract owner can manage bets.
+                      You don&apos;t have permission to access the admin panel. Only the contract owner can manage bets.
                     </p>
                   </div>
                   <Button onClick={() => window.location.href = '/'} className="w-full">
@@ -435,7 +433,7 @@ export function AdminPageClient() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-primary">
-                  {loadingActive ? '...' : activeBetIds?.length || 0}
+                  {loadingActive ? `...` : activeBetIds?.length || 0}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Currently accepting predictions

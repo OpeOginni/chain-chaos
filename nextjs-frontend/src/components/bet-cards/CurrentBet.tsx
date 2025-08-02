@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { useActiveAccount, useActiveWalletChain, useReadContract } from 'thirdweb/react'
+import { useActiveWalletChain, useReadContract } from 'thirdweb/react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -12,21 +12,18 @@ import {
 } from '@/lib/types'
 import { 
   getChainChaosContract,
-  getChainChaosAddress,
   areAddressesAvailable,
   isEtherlinkChain,
   getEtherlinkChainName,
   defaultChain
 } from '@/lib/thirdweb'
 import { Clock, History, Trophy, AlertTriangle } from 'lucide-react'
-import { formatTimestamp } from '@/lib/utils'
 
 interface CurrentBetProps {
   onShowHistory?: () => void
 }
 
 export function CurrentBet({ onShowHistory }: CurrentBetProps) {
-  const account = useActiveAccount()
   const activeChain = useActiveWalletChain()
   const chainId = activeChain?.id || defaultChain.id
 
@@ -38,18 +35,15 @@ export function CurrentBet({ onShowHistory }: CurrentBetProps) {
     }
   }
 
-  const chainChaosAddress = getChainChaosAddress(chainId)
   const addressesAvailable = areAddressesAvailable(chainId)
   const isEtherlink = isEtherlinkChain(chainId)
   const contract = getChainChaosContract(chainId)
-  const isConnected = !!account
 
   // Get active bets (manual system - show most recent active bet)
   const { 
     data: activeBetIds, 
     isLoading: loadingBet, 
     isError: errorBet,
-    refetch: refetchCurrentBet
   } = useReadContract({
     contract: contract!,
     method: 'getActiveBets',

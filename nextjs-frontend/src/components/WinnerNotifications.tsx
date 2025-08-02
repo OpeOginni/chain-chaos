@@ -32,21 +32,11 @@ export function WinnerNotifications({ onClaimSuccess }: WinnerNotificationsProps
   const isConnected = !!account
   const address = account?.address
   const [notifications, setNotifications] = useState<WinnerNotification[]>([])
-  const [loading, setLoading] = useState(false)
   const [dismissing, setDismissing] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (isConnected && address) {
-      fetchNotifications()
-    } else {
-      setNotifications([])
-    }
-  }, [address, isConnected])
 
   const fetchNotifications = async () => {
     if (!address) return
 
-    setLoading(true)
     try {
       const response = await fetch(`/api/notifications?address=${address}`)
       const data = await response.json()
@@ -58,10 +48,16 @@ export function WinnerNotifications({ onClaimSuccess }: WinnerNotificationsProps
       }
     } catch (error) {
       console.error('Error fetching notifications:', error)
-    } finally {
-      setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (isConnected && address) {
+      fetchNotifications()
+    } else {
+      setNotifications([])
+    }
+  }, [address, isConnected])
 
   const dismissNotification = async (betId: string) => {
     if (!address) return

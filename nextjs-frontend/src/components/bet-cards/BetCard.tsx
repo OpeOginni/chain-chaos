@@ -20,16 +20,14 @@ import {
   getChainChaosContract,
   getUSDCContract,
   getChainChaosAddress,
-  getUSDCAddress,
   areAddressesAvailable,
-  isEtherlinkChain,
   defaultChain,
   etherlinkMainnet,
   etherlinkTestnet
 } from '@/lib/thirdweb'
 import { client } from '@/lib/client'
-import { formatEther, formatUSDC, formatBetCategory, formatTimestamp, formatCountdown, formatActualValue, getCategoryUnit, isGasCategory } from '@/lib/utils'
-import { fetchBaselineData, formatBetCategoryName, getPredictionHint } from '@/lib/baseline-data'
+import { formatEther, formatUSDC, formatBetCategory, formatTimestamp, formatCountdown, formatActualValue, isGasCategory } from '@/lib/utils'
+import { fetchBaselineData, getPredictionHint } from '@/lib/baseline-data'
 import { TokenIcon, getTokenSymbol } from '@/components/ui/TokenIcon'
 import { AutomationDetails } from '@/components/bet-cards/AutomationDetails'
 import { Clock, Users, DollarSign, TrendingUp, Loader2, CheckCircle, Trophy, Gift, AlertCircle } from 'lucide-react'
@@ -67,7 +65,7 @@ export function BetCard({ bet, chainId: propChainId }: BetCardProps) {
   // Track transaction type
   const lastTransactionRef = useRef<{ type: 'bet' | 'approve' | 'claim' | null }>({ type: null })
   
-  const { mutate: sendTransaction, data: transactionResult } = useSendTransaction()
+  const { mutate: sendTransaction, } = useSendTransaction()
 
   // Wait for transaction receipt
   const { data: receipt, isLoading: isConfirming } = useWaitForReceipt({
@@ -80,9 +78,7 @@ export function BetCard({ bet, chainId: propChainId }: BetCardProps) {
   })
 
   const chainChaosAddress = getChainChaosAddress(chainId)
-  const usdcAddress = getUSDCAddress(chainId)
   const addressesAvailable = areAddressesAvailable(chainId)
-  const isEtherlink = isEtherlinkChain(chainId)
   const isConnected = !!account
 
   // Get contract instances
@@ -178,7 +174,7 @@ export function BetCard({ bet, chainId: propChainId }: BetCardProps) {
   })
 
   // Get user's bet info including claimed status
-  const { data: playerBetData, refetch: refetchPlayerBetData } = useReadContract({
+  const { data: playerBetData } = useReadContract({
     contract: chainChaosContract!,
     method: "getPlayerBet",
     params: betInfo && account && userParticipated ? [betInfo.id, account.address] : undefined!,
@@ -842,7 +838,7 @@ export function BetCard({ bet, chainId: propChainId }: BetCardProps) {
                       </Button>
                       
                       <p className="text-xs text-muted-foreground text-center">
-                        ⚠️ Only winners can successfully claim. Transaction will revert if you didn't win.
+                        ⚠️ Only winners can successfully claim. Transaction will revert if you didn&apos;t win.
                       </p>
                     </>
                   )}
@@ -878,7 +874,7 @@ export function BetCard({ bet, chainId: propChainId }: BetCardProps) {
                 )}
               </div>
               <Badge variant="outline" className="text-muted-foreground">
-                You didn't participate in this round
+                You didn&apos;t participate in this round
               </Badge>
             </div>
           </>

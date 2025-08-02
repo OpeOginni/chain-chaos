@@ -1,32 +1,26 @@
 'use client'
 
-import { useAccount, useChainId, useSwitchChain } from 'wagmi'
+import { useAccount, useSwitchChain } from 'wagmi'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { EtherlinkIcon } from '@/components/ui/EtherlinkLogo'
 import { 
-  isEtherlinkChain, 
   getEtherlinkChainName, 
   etherlinkMainnet, 
   etherlinkTestnet,
   areAddressesAvailable 
 } from '@/lib/thirdweb'
-import { AlertTriangle, CheckCircle, Wifi, ExternalLink, RefreshCw } from 'lucide-react'
+import { AlertTriangle, ExternalLink, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 
 export function NetworkStatus() {
   const { isConnected, chain } = useAccount()
-  const chainId = useChainId()
   const { switchChain, isPending } = useSwitchChain()
 
   if (!isConnected) {
     return null
   }
-
-  const isEtherlink = isEtherlinkChain(chainId)
-  const networkName = getEtherlinkChainName(chainId)
-  const addressesAvailable = areAddressesAvailable(chainId)
 
   const handleSwitchChain = async (targetChainId: number) => {
     try {
@@ -84,7 +78,7 @@ export function NetworkStatus() {
       <AlertDescription>
         <div className="space-y-3">
           <div>
-            You're connected to <strong>{chain?.name || 'Unknown Network'}</strong>. 
+            You&apos;re connected to <strong>{chain?.name || 'Unknown Network'}</strong>. 
             For the best experience, please switch to one of the supported Etherlink networks:
           </div>
           <div className="flex flex-wrap gap-2">
