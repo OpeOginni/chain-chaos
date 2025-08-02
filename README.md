@@ -6,7 +6,7 @@
 ## 🚀 What is ChainChaos?
 
 **ChainChaos** is a fun, weird, and totally unexpected betting game built on **Etherlink**.  
-Players place bets on the most unpredictable, quirky metrics of the Etherlink blockchain — like how much gas the chain will burn in the next 5 minutes, how many transactions will fly through in the next 10 blocks, or how long the next streak of empty blocks will be.  
+Players place bets on the most unpredictable, quirky metrics of the Etherlink blockchain — like how much gas the chain will burn, how much gas is going to be used on the chain, and even the price of XTZ all randomly selected in 5 minutes intervals.
 
 It's part casino, part chain explorer, part chaos — and 100% fun.  
 
@@ -19,7 +19,7 @@ ChainChaos features a **fully automated betting system** that:
 - **Creates new bets every 5 minutes** with random categories
 - **Fetches real blockchain data** from Etherlink Explorer API
 - **Uses anti-manipulation techniques** like random block sampling
-- **Provides full transparency** with on-chain calculation metadata
+- **Provides full transparency** with verfied contract on chain
 - **Integrates XTZ price data** from CoinGecko for price betting
 
 ### Betting Categories:
@@ -47,8 +47,8 @@ So we made ChainChaos — the game where the *chain itself is the game.*
 
 ## 🧩 How it works
 
-1️⃣ Players choose from a set of **chaotic metrics** to bet on for the next round.  
-2️⃣ They place their stake & submit their guess.  
+1️⃣ Each 5 minutes a betting criteria is choosen from a set of **chaotic metrics**.  
+2️⃣ Users place their stake using XTZ or USDC which ever is currently being used for the prediction section & submit their guess.  
 3️⃣ When the round ends, the smart contract settles based on live chain data.  
 4️⃣ Closest guess wins the pot.  
 
@@ -59,7 +59,7 @@ So we made ChainChaos — the game where the *chain itself is the game.*
 - Longest streak of empty blocks
 - Last digit of cumulative gas at block N
 
-…and more. New chaotic challenges added weekly.
+…and more. Hopefully new chaotic challenges added weekly.
 
 ---
 
@@ -68,19 +68,30 @@ So we made ChainChaos — the game where the *chain itself is the game.*
 - 🧾 **Smart contracts:**  
   - Fully on-chain betting escrow & settlement.  
   - Transparent & auditable.  
-  - Designed for upgradeability.  
+  - Deployed on **Etherlink Testnet**
 
-- 🔗 **Chain data oracle:**  
-  - Fetches real-time Etherlink chain metrics via Golsky.  
+- 🔗 **Chain data oracle (Off Chain):**  
+  - Fetches real-time Etherlink chain metrics.  
   - Transparent reporting: anyone can verify the submitted results.  
-  - Centralized for MVP, but upgradeable to decentralized oracles.  
-
-- 🌉 **Cross-chain liquidity:**  
-  - Players can bridge assets from other chains via Stargate to participate.  
+  - Centralized for MVP, but upgradeable to decentralized oracles.   
 
 - 🖥️ **Frontend:**  
+  - User wallet connection powered by **ThirdWeb**.
   - Simple, fun interface for picking bets & watching rounds play out.  
   - Live leaderboard, round history, and player stats.
+
+## ⚙️ Sponsor Tech Tools
+
+- **Etherlink Blockchain**
+  - used in the `blockchain/hardhat.config.ts`, where the chains are added for deployment
+
+- **ThirdWeb Wallet**
+  - used in the `nextjs-frontned/src/lib/thirdweb.ts`, where we define the etherlink chains so users can connect their wallets to the app.
+
+## Extra Tech Tools
+
+- **Gelato Functions**
+  - Ideally the code and cron running on the `automation` folder, expecially `automation/src/index.ts` is to be running on the Gelato functions service, but I was unable to get access to the service before the end of the hack. But running this service on a backend works just as good.
 
 ---
 
